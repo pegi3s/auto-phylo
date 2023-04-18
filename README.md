@@ -6,7 +6,7 @@ An online manual is available [here](http://evolution6.i3s.up.pt/static/auto-phy
 
 # Using the auto-phylo image in Linux
 
-You should adapt and run the following command: `docker run --rm -v /your/data/dir:/data -v /var/run/docker.sock:/var/run/docker.sock docker run pegi3s/auto-phylo`
+You should adapt and run the following command: `docker run --rm -v /your/data/dir:/data -v /var/run/docker.sock:/var/run/docker.sock pegi3s/auto-phylo`
 
 In this command, you should replace `/your/data/dir` to point to the directory that contains the input files of the pipeline. 
 
@@ -20,4 +20,4 @@ The [online manual](http://evolution6.i3s.up.pt/static/auto-phylo/docs/test_data
 
 Please note that data must be under the same drive than the Docker Toolbox installation (usually `C:`) and in a folder with write permissions (e.g. `C:/Users/User_name/`).
 
-You should adapt and run the following command: `docker run --rm -v "/c/Users/User_name/dir/":/data -v /var/run/docker.sock:/var/run/docker.sock docker run pegi3s/auto-phylo`
+You should adapt and run the following command: `docker run --rm -v "/c/Users/User_name/dir/":/data -v /var/run/docker.sock:/var/run/docker.sock pegi3s/auto-phylo`
