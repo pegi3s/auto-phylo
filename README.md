@@ -21,3 +21,9 @@ The [online manual](http://evolution6.i3s.up.pt/static/auto-phylo/docs/test_data
 Please note that data must be under the same drive than the Docker Toolbox installation (usually `C:`) and in a folder with write permissions (e.g. `C:/Users/User_name/`).
 
 You should adapt and run the following command: `docker run --rm -v "/c/Users/User_name/dir/":/data -v /var/run/docker.sock:/var/run/docker.sock pegi3s/auto-phylo`
+
+# Citing
+
+If you use auto-phylo, please cite this publication:
+
+> H. López-Fernández; M. Pinto; C.P. Vieira; P. Duque; M. Reboiro-Jato; J. Vieira (2023) [Auto-phylo: A Pipeline Maker for Phylogenetic Studies](https://doi.org/10.1007/978-3-031-38079-2_3). 17th International Conference on Practical Applications of Computational Biology & Bioinformatics: PACBB 2023. Guimarães, Portugal. 12 - July
