@@ -23,7 +23,7 @@ Please note that you must have a `pipeline` and a `config` file under `/your/dat
 
 # Test data
 
-The [online manual](http://evolution6.i3s.up.pt/static/auto-phylo/docs/index.html/test_data.html) provides multiple test data examples that can be used to test the program.
+The [online manual](http://evolution6.i3s.up.pt/static/auto-phylo/v2/docs/test_data.html) provides multiple test data examples that can be used to test the program.
 
 # Using the auto-phylo image in Windows
 
