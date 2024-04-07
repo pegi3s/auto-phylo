@@ -4,6 +4,8 @@ This image facilitates the usage of **auto-phylo**, a pipeline maker for phyloge
 
 # Versions
 
+## v2.0.1 - April 2024
+
 ## v2 - October 2023
 
 An online manual is available [here](http://evolution6.i3s.up.pt/static/auto-phylo/v2/docs/).
