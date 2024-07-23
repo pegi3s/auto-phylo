@@ -1,13 +1,12 @@
 FROM pegi3s/docker:20.04
 
 RUN apt-get update -y && \
-    apt-get install -y unzip
-
-COPY auto-phylo-scripts.zip /opt
+    apt-get install -y unzip wget
 
 WORKDIR /opt
 
-RUN unzip auto-phylo-scripts.zip && \
-    rm /opt/auto-phylo-scripts.zip
+COPY version3.zip /opt
 
-CMD /opt/main
+RUN unzip version3.zip && \
+     rm /opt/version3.zip
+CMD /opt/pre_main
