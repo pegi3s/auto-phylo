@@ -1,0 +1,15 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Aligning nucleotide sequences with Probcons"
+mkdir -p /data/$prefix"1-PC_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/probcons_nuc bash -c "probcons /data/$input_dir/$file_name > /data/$prefix"1-PC_sequence_alignment"/$file_name.nuc_aligned" > /dev/null 2>&1
+$start reformat -id /data/$prefix"1-PC_sequence_alignment" -od /data/$prefix"1-PC_sequence_alignment" -rlb
+mkdir -p  /data/$out_dir
+cp /data/$prefix"1-PC_sequence_alignment"/*.nuc_aligned /data/$out_dir

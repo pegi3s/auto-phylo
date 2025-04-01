@@ -1,0 +1,15 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Prefix sequences"
+mkdir -p /data/$prefix"1-Prefix" /data/$out_dir
+$start rename-header-add-word -id /data/$input_dir -od /data/$prefix"1-Prefix" -p prefix -s "C" -dl "_" -idl "" -ai
+cp /data/$prefix"1-Prefix"/* /data/$out_dir
+

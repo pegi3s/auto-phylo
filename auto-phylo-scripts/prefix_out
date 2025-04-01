@@ -1,0 +1,15 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Taking prefixes out"
+mkdir -p /data/$prefix"1-Prefix_out" /data/$out_dir
+$start rename-header-multipart -id /data/$input_dir -od /data/$prefix"1-Prefix_out" -fd "_" -fm remove -f 1
+cp /data/$prefix"1-Prefix_out"/* /data/$out_dir
+

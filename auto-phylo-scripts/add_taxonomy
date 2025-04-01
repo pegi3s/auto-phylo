@@ -1,0 +1,35 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Adding taxonomy information"
+mkdir -p /data/$prefix"1-Add_taxonomy"/tmp /data/$out_dir
+taxonomy_header_1=$(echo $add_tax_taxonomy_header | sed "s/ / \-itf /g")
+cd /data/$input_dir
+for f in *; do
+	mv $f /data/$prefix"1-Add_taxonomy"/tmp
+	$start rename-ncbi -id /data/$prefix"1-Add_taxonomy"/tmp -od /data/$out_dir -hp prefix -hd '_' -rbs -rsc -r "_" -nd "_" -itf $taxonomy_header_1 > /dev/null 2>&1
+	mv /data/$prefix"1-Add_taxonomy"/tmp/$f /data/$input_dir
+	s=$(shuf -i 1-3 -n 1)
+	sleep $s
+done
+$start rename-header-replace-interval -id /data/$out_dir -od /data/$out_dir -ht "all" -fr "(" -to ")" -ir ""
+$start rename-header-replace-word -id /data/$out_dir -od /data/$out_dir -ht "all" -tw "\." -r -rp "_"
+$start rename-header-replace-word -id /data/$out_dir -od /data/$out_dir -ht "all" -tw "__" -r -rp "_"
+rmdir /data/$prefix"1-Add_taxonomy"/tmp
+cd /data
+cd /data/$input_dir && ls * > /data/$prefix"1-Add_taxonomy"/original_list
+cd /data/$out_dir && ls * > /data/$prefix"1-Add_taxonomy"/final_list
+cat /data/$prefix"1-Add_taxonomy"/original_list /data/$prefix"1-Add_taxonomy"/final_list | sort | uniq -d > /data/$prefix"1-Add_taxonomy"/unprocessed_list
+mkdir /data/$prefix"2-Files_that_failed"
+while read list; do
+	cp /data/$input_dir/"$list" /data/$prefix"2-Files_that_failed"
+	rm /data/$out_dir/"$list"
+done < /data/$prefix"1-Add_taxonomy"/unprocessed_list
+

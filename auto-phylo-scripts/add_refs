@@ -1,0 +1,14 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Adding reference sequences"
+mkdir -p /data/$out_dir
+cp /data/$add_refs_reference /data/$input_dir
+$start merge -id /data/$input_dir -od /data/$out_dir -n "refseq_added" -rlb -lb unix -sc "original" > /dev/null 2>&1
+rm /data/$input_dir/$add_refs_reference

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Refining sequences with Probcons"
+mkdir -p /data/$prefix"1-Probcons_sequence_refinement"
+docker run --rm -v $dir:/data pegi3s/probcons_nuc bash -c "probcons -ir $probcons_refin_iterations /data/$input_dir/$file_name > /data/$prefix"1-Probcons_sequence_refinement"/$file_name.refined.nuc_aligned" > /dev/null 2>&1
+mkdir -p  /data/$out_dir
+cp /data/$prefix"1-Probcons_sequence_refinement"/*.nuc_aligned /data/$out_dir
+
+

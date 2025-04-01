@@ -1,0 +1,48 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Check for unwanted genomes"
+mkdir -p /data/$prefix"1-Contamination_check"/tmp
+mkdir -p /data/$input_dir/tmp
+cd /data/$input_dir
+for f in *; do
+	mv $f /data/$prefix"1-Contamination_check"/tmp
+	$start rename-ncbi -id /data/$prefix"1-Contamination_check"/tmp -od /data/$prefix"1-Contamination_check" -fp suffix -fd "_" -hp none -rbs -rsc -r "_" -nd "#" -itf $check_cont_taxonomy > /dev/null 2>&1
+	mv /data/$prefix"1-Contamination_check"/tmp/$f /data/$input_dir
+	s=$(shuf -i 1-3 -n 1)
+	sleep $s
+done
+rmdir /data/$prefix"1-Contamination_check"/tmp
+cd /data
+mkdir -p /data/$prefix"2-Not_contaminated"
+cp /data/$prefix"1-Contamination_check"/*\#$check_cont_category /data/$prefix"2-Not_contaminated"
+mkdir -p /data/$prefix"3-Control_lists"
+cd /data/$prefix"1-Contamination_check" && ls * > /data/$prefix"3-Control_lists"/original_list
+cd /data/$prefix"2-Not_contaminated" && ls * > /data/$prefix"3-Control_lists"/filtered_list
+cat /data/$prefix"3-Control_lists"/original_list /data/$prefix"3-Control_lists"/filtered_list | sort | uniq -u > /data/$prefix"3-Control_lists"/suspicious_list
+mkdir -p /data/$prefix"4-Suspicious_Files"
+while read list; do
+	cp /data/$prefix"1-Contamination_check"/"$list" /data/$prefix"4-Suspicious_Files"
+	rm /data/$prefix"2-Not_contaminated"/"$list"
+done < /data/$prefix"3-Control_lists"/suspicious_list
+mkdir -p /data/$out_dir
+cp /data/$prefix"2-Not_contaminated"/* /data/$out_dir
+
+
+ 
+
+
+
+
+
+
+
+
+

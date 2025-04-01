@@ -1,0 +1,44 @@
+#!/bin/bash
+
+. /data/config
+
+blastn_input_dir=$1
+blastn_results_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Blastn"
+mkdir -p /data/tmp/reformat /data/$blastn_results_dir /data/$prefix"1-blastn"
+cd /data/$blastn_input_dir
+ls * > /data/tmp/list
+sed -i "s/^tmp\:$//g" /data/tmp/list
+sed -i "/^ *$/d" /data/tmp/list
+cd /data
+while read name; do
+	cp /data/$blastn_input_dir/$name /data/tmp/reformat/
+	$start reformat -id /data/tmp/reformat -od /data/tmp/reformat -rlb > /dev/null 2>&1
+	mv /data/tmp/reformat/$name /data/tmp/input_original
+	while read header; do
+		read sequence
+		header_mod=${header:0:48}
+		echo $header_mod >> /data/tmp/input_original.truncated
+		echo $sequence >> /data/tmp/input_original.truncated
+	done < /data/tmp/input_original	
+	cut -f1 -d' ' /data/tmp/input_original.truncated > /data/tmp/input
+	rm /data/tmp/input_original.truncated
+	docker run --rm -v $dir/tmp:/data pegi3s/utilities fasta_remove_line_breaks /data/input > /dev/null 2>&1
+	docker run --rm -v $dir:/data pegi3s/blast makeblastdb -in /data/tmp/input -out /data/tmp/$name -dbtype nucl -parse_seqids > /dev/null 2>&1
+	docker run --rm -v $dir:/data pegi3s/blast blastn -query /data/$blastn_query -db /data/tmp/$name -evalue $blastn_expect -outfmt 6 -out /data/tmp/$name.output > /dev/null 2>&1
+	rm /data/tmp/*.ndb /data/tmp/*.nhr /data/tmp/*.nin /data/tmp/*.njs /data/tmp/*.nog /data/tmp/*.nos /data/tmp/*.not /data/tmp/*.nsq /data/tmp/*.ntf /data/tmp/*.nto
+	cut -f2 /data/tmp/$name.output | sort -u > /data/tmp/$name.unique
+	while read name_unique; do
+		grep -A1 $name_unique /data/tmp/input_original >> /data/$blastn_results_dir/$name
+	done < /data/tmp/$name.unique
+	if test -f "/data/$blastn_results_dir/$name"; then
+    		sed -i s"/lcl|//g" /data/$blastn_results_dir/$name
+	fi	
+	mv /data/tmp/$name.output /data/$prefix"1-blastn"/
+done < /data/tmp/list
+rm -r /data/tmp/reformat
+rm /data/tmp/* && rmdir /data/tmp

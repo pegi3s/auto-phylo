@@ -1,0 +1,14 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "ML tree inference using Fasttree"
+mkdir -p /data/$prefix"1-Fasttree_tree" /data/$out_dir
+docker run --rm -v $dir:/data pegi3s/fasttree bash -c "FastTree -nt -gtr -gamma /data/$input_dir/$file_name > /data/$prefix"1-Fasttree_tree"/$file_name.tree" > /dev/null 2>&1
+cp /data/$prefix"1-Fasttree_tree"/$file_name.tree /data/$out_dir/$file_name.nwk
+

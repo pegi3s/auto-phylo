@@ -1,0 +1,32 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+file_name=$(cd /data/$input_dir && ls *)
+
+mkdir -p /data/$prefix"1-T-coffee_AA_Translated_sequences"
+docker run --rm -v $dir:/data pegi3s/emboss transeq -sequence /data/$input_dir/$file_name -outseq /data/$prefix"1-T-coffee_AA_Translated_sequences"/$file_name.pep
+cd /data/$prefix"1-T-coffee_AA_Translated_sequences"
+sed -i 's/_1$//g' /data/$prefix"1-T-coffee_AA_Translated_sequences"/$file_name.pep
+cd /data
+
+echo "Aligning amino acid sequences with T-coffee"
+mkdir -p /data/$prefix"2-T-coffee_AA_AA_sequence_alignment_Clustal"
+docker run --rm -v $dir:/data pegi3s/tcoffee t_coffee /data/$prefix"1-T-coffee_AA_Translated_sequences"/$file_name.pep -run_name /data/$prefix"2-T-coffee_AA_AA_sequence_alignment_Clustal"/$file_name.aln
+
+echo "Converting to FASTA"
+mkdir -p /data/$prefix"3-T-coffee_AA_convert_to_FASTA"
+touch /data/$prefix"3-T-coffee_AA_convert_to_FASTA"/$file_name.pep_aligned
+docker run --rm -v $dir:/data pegi3s/tcoffee t_coffee -other_pg seq_reformat -in /data/$prefix"2-T-coffee_AA_AA_sequence_alignment_Clustal"/$file_name.aln -output fasta > /data/$prefix"3-T-coffee_AA_convert_to_FASTA"/$file_name.pep_aligned
+
+echo "Creating a nucleotide alignment using the amino acid alignment as a guide"
+mkdir -p /data/$prefix"4-T-coffee_AA_Nuc_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/translatorx translatorx_vLocal.pl -i /data/$input_dir/$file_name -a /data/$prefix"3-T-coffee_AA_convert_to_FASTA"/$file_name.pep_aligned -o /data/$prefix"4-T-coffee_AA_Nuc_sequence_alignment"/$file_name.nuc_aligned > /dev/null 2>&1
+cd /data/$prefix"4-T-coffee_AA_Nuc_sequence_alignment"
+mv $file_name.nuc_aligned.nt_ali.fasta $file_name.nuc_aligned
+rm $file_name*ali.fasta
+cd /data
+mkdir -p  /data/$out_dir
+cp /data/$prefix"4-T-coffee_AA_Nuc_sequence_alignment"/*.nuc_aligned /data/$out_dir
