@@ -1,0 +1,36 @@
+#!/bin/bash
+
+probcons_refinement_autop_version=3.0.0
+probcons_refinement_docker_version=1.1
+probcons_refinement_program_version=1.1
+probcons_ref="Do CB, Mahabhashyam MS, Brudno M, Batzoglou S. (2005)"
+probcons_doi="10.1101/gr.2821705"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$probcons_refinement_docker_c_version" != "" ]; then
+	probcons_refinement_autop_version="?"
+	probcons_refinement_docker_version=$probcons_refinement_docker_c_version
+	probcons_refinement_program_version="?"
+	probcons_ref="?"
+	probcons_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Refining sequences with Probcons"
+mkdir -p /data/$prefix"1-Probcons_sequence_refinement"
+docker run --rm -v $dir:/data pegi3s/probcons_nuc:$probcons_refinement_docker_version bash -c "probcons -ir $probcons_refin_iterations /data/$input_dir/$file_name > /data/$prefix"1-Probcons_sequence_refinement"/$file_name.refined.nuc_aligned" > /dev/null 2>&1
+mkdir -p  /data/$out_dir
+cp /data/$prefix"1-Probcons_sequence_refinement"/*.nuc_aligned /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Probcons_refinement" "$versions_file"; then
+    echo "Probcons_refinement $probcons_refinement_autop_version,pegi3s/probcons:$probcons_refinement_docker_version,Probcons $probcons_refinement_program_version,\"$probcons_ref\",\"$probcons_doi\"" >> "$versions_file"
+fi
+echo -e "probcons_ref=\"$probcons_ref\"\nprobcons_doi=\"$probcons_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

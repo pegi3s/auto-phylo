@@ -1,0 +1,85 @@
+#!/bin/bash
+
+getlist_autop_version=3.0.0
+getlist_entrezd_docker_version=10.0.20180927
+getlist_entrezd_program_version=10.0.20180927
+getlist_seda_docker_version=1.6.1
+getlist_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+entrez_direct_ref="Kans J. (2013)"
+
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$getlist_entrezd_docker_c_version" != "" ]; then
+	getlist_autop_version="?"
+	getlist_entrezd_docker_version=$getlist_entrezd_docker_c_version
+	getlist_entrezd_program_version="?"
+	entrez_direct_ref="?"
+fi
+
+if [ "$getlist_seda_docker_c_version" != "" ]; then
+	getlist_autop_version="?"
+	getlist_seda_docker_version=$getlist_seda_docker_c_version
+	getlist_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data -v /var/run/docker.sock:/var/run/docker.sock -v /tmp:/tmp pegi3s/seda:$getlist_seda_docker_version /opt/SEDA/run-cli.sh")
+
+mkdir -p /data/$prefix"1-getlist" /data/$out_dir
+echo "Getting the NCBI accession numbers"
+
+input_file=$(find "/data/$input_dir" -type f -print -quit)
+
+while IFS= read -r getlist_query; do
+    query_name=$(echo $getlist_query | tr " " "_" | tr -cd '[:alnum:]_')
+
+    output_file=/data/$out_dir/${query_name}_acc_numbers
+
+    docker run --rm -v $dir:/data pegi3s/entrez-direct:$getlist_entrezd_docker_version bash -c "esearch -db assembly -query '$getlist_query[orgn] AND \"representative genome\"[RefSeq Category]' | efetch -format docsum | xtract -pattern DocumentSummary -element AssemblyAccession" > $output_file
+    docker run --rm -v $dir:/data pegi3s/entrez-direct:$getlist_entrezd_docker_version bash -c "esearch -db assembly -query '$getlist_query[orgn] AND \"reference genome\"[RefSeq Category]' | efetch -format docsum | xtract -pattern DocumentSummary -element AssemblyAccession" >> $output_file
+
+    temp_file=/data/$out_dir/${query_name}_temp_file
+
+    > $temp_file
+
+    while IFS= read -r acc_number; do
+        if [[ "$getlist_db" == "genbank" && $acc_number == GCF* ]]; then
+            GCA=$(docker run --rm -v "$dir:/data" pegi3s/entrez-direct:$getlist_entrezd_docker_version bash -c "esearch -db assembly -query \"$acc_number\" | efetch -format docsum | xtract -pattern DocumentSummary -element Genbank")
+            if [ ! -z "$GCA" ]; then
+                echo $GCA >> $temp_file
+            fi
+        elif [[ "$getlist_db" == "refseq" && $acc_number == GCA* ]]; then
+            GCF=$(docker run --rm -v "$dir:/data" pegi3s/entrez-direct:$getlist_entrezd_docker_version bash -c "esearch -db assembly -query \"$acc_number\" | efetch -format docsum | xtract -pattern DocumentSummary -element RefSeq")
+            if [ ! -z "$GCF" ]; then
+                echo $GCF >> $temp_file
+            fi
+        else
+            echo $acc_number >> $temp_file
+        fi
+    done < $output_file
+
+    mv $output_file /data/$prefix"1-getlist"
+    if [[ "$getlist_db" != "genbank" && $getlist_db != "refseq" ]]; then
+   	getlist_db="genbank_refseq"
+    fi
+    mv $temp_file /data/$out_dir/${query_name}_${getlist_db}_acc
+
+done < $input_file
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*getlist" "$versions_file"; then
+    echo "getlist $getlist_autop_version,pegi3s/entrez-direct:$getlist_entrezd_docker_version,Entrez-Direct $getlist_entrezd_program_version,\"$entrez_direct_ref\"," >> "$versions_file"
+    echo ",pegi3s/seda:$getlist_seda_docker_version,SEDA $getlist_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "entrez_direct_ref=\"$entrez_direct_ref\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

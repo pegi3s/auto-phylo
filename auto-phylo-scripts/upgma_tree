@@ -1,0 +1,39 @@
+#!/bin/bash
+
+upgma_tree_autop_version=3.0.0
+upgma_tree_megaxcc_docker_version=10.0.5
+upgma_tree_megaxcc_program_version=10.0.5
+megaxcc_ref="Kumar, S., Stecher, G., Peterson, D., & Tamura, K. (2012)"
+megaxcc_doi="10.1093/bioinformatics/bts507"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$upgma_tree_megaxcc_docker_c_version" != "" ]; then
+	upgma_tree_autop_version="?"
+	upgma_tree_megaxcc_docker_version=$upgma_tree_megaxcc_docker_c_version
+	upgma_tree_megaxcc_program_version="?"
+	megaxcc_ref="?"
+	megaxcc_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+mkdir -p /data/$prefix"1-UPGMA_MEGA_tree_construction"/mega_upgma_out  /data/$out_dir
+echo "Building an UPGMA tree using MEGA"
+cd /opt
+sed "s/\#bootstrap\#/$upgma_tree_bootstrap/g; s/\#treatment\#/$upgma_tree_treatment/g" upgma_tree.mao > /data/$prefix"1-UPGMA_MEGA_tree_construction"/upgma.mao
+cp /data/$input_dir/$file_name /data/$prefix"1-UPGMA_MEGA_tree_construction"/$file_name.fas
+docker run --rm -v $dir:/data pegi3s/megax_cc:$upgma_tree_megaxcc_docker_version megacc -a /data/$prefix"1-UPGMA_MEGA_tree_construction"/upgma.mao -d /data/$prefix"1-UPGMA_MEGA_tree_construction"/$file_name.fas -o /data/$prefix"1-UPGMA_MEGA_tree_construction"/mega_upgma_out > /dev/null 2>&1
+cp /data/$prefix"1-UPGMA_MEGA_tree_construction"/mega_upgma_out/$file_name"-1.nwk" /data/$out_dir/$file_name.nwk
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*upgma_tree" "$versions_file"; then
+    echo "upgma_tree $upgma_tree_autop_version,pegi3s/megaxcc:$upgma_tree_megaxcc_docker_version,MegaX_CC $upgma_tree_megaxcc_program_version,\"$megaxcc_ref\",\"$megaxcc_doi\"" >> "$versions_file"
+fi
+
+echo -e "megaxcc_ref=\"$megaxcc_ref\"\nmegaxcc_doi=\"$megaxcc_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

@@ -1,0 +1,44 @@
+#!/bin/bash
+
+view_trees_autop_version=3.0.0
+view_trees_newick_utils_docker_version=1.6
+view_trees_newick_utils_program_version=1.6
+newick_utils_ref="Junier T, Zdobnov EM. (2010)"
+newick_utils_doi="10.1093/bioinformatics/btq243"
+
+. /data/config
+
+if [ "$view_trees_newick_utils_docker_c_version" != "" ]; then
+	view_trees_autop_version="?"
+	view_trees_newick_utils_docker_version=$view_trees_newick_utils_docker_c_version
+	view_trees_newick_utils_program_version="?"
+	newick_utils_ref="?"
+	newick_utils_doi="?"
+fi
+
+if [[ "$vt_show_branch_length" == "y" ]]; then
+   a=""
+else
+   a=" -b 'visibility:hidden'"
+fi
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+mkdir -p /data/$prefix"1-display_trees" /data/$out_dir
+echo "Displaying Newick trees"
+
+input_file=$(basename /data/$input_dir/*.nwk)
+
+docker run --rm -v $dir:/data pegi3s/newick_utils:$view_trees_newick_utils_docker_version bash -c "nw_ed /data/$input_dir/$input_file 'b < $vt_support_cutoff' o > tmp.svg && nw_display -w $vt_columns $a -s tmp.svg > /data/$out_dir/$input_file.svg" > /dev/null 2>&1
+sed -i 's/<defs><style type/\n<rect width="100%" height="100%" fill="white"\/>\n<defs><style type/g' /data/$out_dir/$input_file.svg
+cp /data/$out_dir/$input_file.svg /data/$prefix"1-display_trees"
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*view_trees" "$versions_file"; then
+    echo "view_trees $view_trees_autop_version,pegi3s/newick_utils:$view_trees_newick_utils_docker_version,newick-utils $view_trees_newick_utils_program_version,\"$newick_utils_ref\",\"$newick_utils_doi\"" >> "$versions_file"
+fi
+
+echo -e "newick_utils_ref=\"$newick_utils_ref\"\nnewick_utils_doi=\"$newick_utils_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

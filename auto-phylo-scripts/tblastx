@@ -1,0 +1,84 @@
+#!/bin/bash
+
+tblastx_autop_version=3.0.0
+tblastx_blast_docker_version=2.15.0
+tblastx_blast_program_version=2.14.0
+tblastx_seda_docker_version=1.6.1
+tblastx_seda_program_version=1.6.1
+tblastx_utilities_docker_version=0.22.2
+tblastx_utilities_program_version=0.22.0
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+tblastx_input_dir=$1
+tblastx_results_dir=$2
+prefix=$3
+
+if [ "$tblastx_blast_docker_c_version" != "" ]; then
+	tblastx_autop_version="?"
+	tblastx_blast_docker_version=$tblastx_blast_docker_c_version
+	tblastx_blast_program_version="?"
+fi
+
+if [ "$tblastx_seda_docker_c_version" != "" ]; then
+	tblastx_autop_version="?"
+	tblastx_seda_docker_version=$tblastx_seda_docker_c_version
+	tblastx_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+if [ "$tblastx_utilities_docker_c_version" != "" ]; then
+	tblastx_autop_version="?"
+	tblastx_utilities_docker_version=$tblastx_utilities_docker_c_version
+	tblastx_utilities_program_version="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$tblastx_seda_docker_version /opt/SEDA/run-cli.sh")
+
+echo "tblastx"
+mkdir -p /data/tmp/reformat /data/$tblastx_results_dir /data/$prefix"1-tblastx"
+cd /data/$tblastx_input_dir
+ls * > /data/tmp/list
+sed -i "s/^tmp\:$//g" /data/tmp/list
+sed -i "/^ *$/d" /data/tmp/list
+cd /data
+while read name; do
+	cp /data/$tblastx_input_dir/$name /data/tmp/reformat/
+	$start reformat -id /data/tmp/reformat -od /data/tmp/reformat -rlb > /dev/null 2>&1
+	mv /data/tmp/reformat/$name /data/tmp/input_original
+	while read header; do
+		read sequence
+		header_mod=${header:0:48}
+		echo $header_mod >> /data/tmp/input_original.truncated
+		echo $sequence >> /data/tmp/input_original.truncated
+	done < /data/tmp/input_original	
+	cut -f1 -d' ' /data/tmp/input_original.truncated > /data/tmp/input
+	rm /data/tmp/input_original.truncated
+	docker run --rm -v $dir/tmp:/data pegi3s/utilities:$tblastx_utilities_docker_version fasta_remove_line_breaks /data/input  > /dev/null 2>&1
+	docker run --rm -v $dir:/data pegi3s/blast:$tblastx_blast_docker_version makeblastdb -in /data/tmp/input -out /data/tmp/$name -dbtype nucl -parse_seqids  > /dev/null 2>&1
+	docker run --rm -v $dir:/data pegi3s/blast:$tblastx_blast_docker_version tblastx -query /data/$tblastx_query -db /data/tmp/$name -evalue $tblastx_expect -outfmt 6 -out /data/tmp/$name.output  > /dev/null 2>&1
+	rm /data/tmp/*.ndb /data/tmp/*.nhr /data/tmp/*.nin /data/tmp/*.njs /data/tmp/*.nog /data/tmp/*.nos /data/tmp/*.not /data/tmp/*.nsq /data/tmp/*.ntf /data/tmp/*.nto
+	cut -f2 /data/tmp/$name.output | sort -u > /data/tmp/$name.unique
+	while read name_unique; do
+		grep -A1 $name_unique /data/tmp/input_original >> /data/$tblastx_results_dir/$name
+	done < /data/tmp/$name.unique
+	if test -f "/data/$tblastx_results_dir/$name"; then
+    		sed -i s"/lcl|//g" /data/$tblastx_results_dir/$name
+	fi	
+	mv /data/tmp/$name.output /data/$prefix"1-tblastx"/
+done < /data/tmp/list
+rm -r /data/tmp/reformat
+rm /data/tmp/* && rmdir /data/tmp
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*tblastx" "$versions_file"; then
+    echo "tblastx $tblastx_autop_version,pegi3s/blast:$tblastx_blast_docker_version,BLAST $tblastx_blast_program_version,," >> "$versions_file"
+    echo ",pegi3s/seda:$tblastx_seda_docker_version,SEDA $tblastx_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+    echo ",pegi3s/utilities:$tblastx_utilities_docker_version,utilities $tblastx_utilities_program_version,," >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

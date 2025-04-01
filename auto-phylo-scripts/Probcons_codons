@@ -1,0 +1,97 @@
+#!/bin/bash
+
+probcons_codons_autop_version=3.0.0
+probcons_codons_docker_version=1.12
+probcons_codons_program_version=1.12
+probcons_codons_emboss_docker_version=6.6.0
+probcons_codons_emboss_program_version=6.6.0
+probcons_codons_translatorx_docker_version=01.09.2022
+probcons_codons_translatorx_program_version="https://translatorx.org"
+probcons_codons_seda_docker_version=1.6.1
+probcons_codons_seda_program_version=1.6.1
+probcons_ref="Do CB, Mahabhashyam MS, Brudno M, Batzoglou S. (2005)"
+probcons_doi="10.1101/gr.2821705"
+emboss_ref="Rice, P., Longden, I., & Bleasby, A. (2000)"
+emboss_doi="10.1016/s0168-9525(00)02024-2"
+translatorx_ref="Abascal, F., Zardoya, R., & Telford, M. J. (2010)"
+translatorx_doi="10.1093/nar/gkq291"
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$probcons_codons_docker_c_version" != "" ]; then
+	probcons_codons_autop_version="?"
+	probcons_codons_docker_version=$probcons_codons_docker_c_version
+	probcons_codons_program_version="?"
+	probcons_ref="?"
+	probcons_doi="?"
+fi
+
+if [ "$probcons_codons_emboss_docker_c_version" != "" ]; then
+	probcons_codons_autop_version="?"
+	probcons_codons_emboss_docker_version=$probcons_codons_emboss_docker_c_version
+	probcons_codons_emboss_program_version="?"
+	emboss_ref="?"
+	emboss_doi="?"
+fi
+
+if [ "$probcons_codons_translatorx_docker_c_version" != "" ]; then
+	probcons_codons_autop_version="?"
+	probcons_codons_translatorx_docker_version=$probcons_codons_translatorx_docker_c_version
+	probcons_codons_translatorx_program_version="?"
+	translatorx_ref="?"
+	translatorx_doi="?"
+fi
+
+if [ "$probcons_codons_seda_docker_c_version" != "" ]; then
+	probcons_codons_autop_version="?"
+	probcons_codons_seda_docker_version=$probcons_codons_seda_docker_c_version
+	probcons_codons_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$probcons_codons_seda_docker_version /opt/SEDA/run-cli.sh")
+
+file_name=$(cd /data/$input_dir && ls *)
+
+mkdir -p /data/$prefix"1-PC_Translated_sequences"
+docker run --rm -v $dir:/data pegi3s/emboss:$probcons_codons_emboss_docker_version transeq -sequence /data/$input_dir/$file_name -outseq /data/$prefix"1-PC_Translated_sequences"/$file_name.pep
+$start reformat -id /data/$prefix"1-PC_Translated_sequences" -od /data/$prefix"1-PC_Translated_sequences" -rlb
+cd /data/$prefix"1-PC_Translated_sequences"
+sed -i 's/_1$//g' /data/$prefix"1-PC_Translated_sequences"/$file_name.pep
+cd /data
+
+echo "Aligning amino acid sequences with Probcons"
+mkdir -p /data/$prefix"2-PC_AA_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/probcons:$probcons_codons_docker_version bash -c "probcons /data/$prefix"1-PC_Translated_sequences"/$file_name.pep > /data/$prefix"2-PC_AA_sequence_alignment"/$file_name.pep_aligned" > /dev/null 2>&1
+$start reformat -id /data/$prefix"2-PC_AA_sequence_alignment" -od /data/$prefix"2-PC_AA_sequence_alignment" -rlb
+
+echo "Creating a nucleotide alignment using the amino acid alignment as a guide"
+mkdir -p /data/$prefix"3-PC_Nuc_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/translatorx:$probcons_codons_translatorx_docker_version translatorx_vLocal.pl -i /data/$input_dir/$file_name -a /data/$prefix"2-PC_AA_sequence_alignment"/$file_name.pep_aligned -o /data/$prefix"3-PC_Nuc_sequence_alignment"/$file_name.nuc_aligned > /dev/null 2>&1
+cd /data/$prefix"3-PC_Nuc_sequence_alignment"
+mv $file_name.nuc_aligned.nt_ali.fasta $file_name.nuc_aligned
+rm $file_name*ali.fasta
+cd /data
+mkdir -p  /data/$out_dir
+cp /data/$prefix"3-PC_Nuc_sequence_alignment"/*.nuc_aligned /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Probcons_codons" "$versions_file"; then
+    echo "Probcons_codons $probcons_codons_autop_version,pegi3s/probcons:$probcons_codons_docker_version,Probcons $probcons_codons_program_version,\"$probcons_ref\",\"$probcons_doi\"" >> "$versions_file"
+    echo ",pegi3s/emboss:$probcons_codons_emboss_docker_version,EMBOSS $probcons_codons_emboss_program_version,\"$emboss_ref\",\"$emboss_doi\"" >> /"$versions_file"
+    echo ",pegi3s/translatorx ($probcons_codons_translatorx_docker_version),Translator X ($probcons_codons_translatorx_program_version),\"$translatorx_ref\",\"$translatorx_doi\"" >> "$versions_file"
+    echo ",pegi3s/seda:$probcons_codons_seda_docker_version,SEDA $probcons_codons_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "probcons_ref=\"$probcons_ref\"\nprobcons_doi=\"$probcons_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "emboss_ref=\"$emboss_ref\"\nemboss_doi=\"$emboss_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "translatorx_ref=\"$translatorx_ref\"\ntranslatorx_ref=\"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

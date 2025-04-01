@@ -1,0 +1,110 @@
+#!/bin/bash
+
+tree_collapse_autop_version=3.0.0
+tree_collapse_docker_version=1.1.0
+tree_collapse_program_version=1.1.0
+tree_collapse_seda_docker_version=1.6.1
+tree_collapse_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$tree_collapse_docker_c_version" != "" ]; then
+	tree_collapse_autop_version="?"
+	tree_collapse_docker_version=$tree_collapse_docker_c_version
+	tree_collapse_program_version="?"
+fi
+
+if [ "$tree_collapse_seda_docker_c_version" != "" ]; then
+	tree_collapse_autop_version="?"
+	tree_collapse_seda_docker_version=$tree_collapse_seda_docker_c_version
+	tree_collapse_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+echo "Collapsing the tree..."
+mkdir -p /data/$prefix"1-Collapsed_tree" /data/$out_dir
+file_name=$(cd /data/$input_dir && ls *)
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$tree_collapse_seda_docker_version /opt/SEDA/run-cli.sh")
+
+if [ "$tc_taxonomy" = "" ]; then
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $dir:/data pegi3s/phylogenetic-tree-collapser:$tree_collapse_docker_version collapse-tree.py --input /data/$input_dir/*.nwk --input-format newick --output /data/$prefix"1-Collapsed_tree"/$file_name.tree_collapsed --output-type phylogram --output-collapsed-nodes /data/$prefix"1-Collapsed_tree"/$file_name.collapsed_nodes --input-path-host $dir > /dev/null 2>&1
+	mv /data/$input_dir/$file_name.sequence_to_species_mapping /data/$prefix"1-Collapsed_tree"
+	mv /data/$input_dir/$file_name.taxonomy /data/$prefix"1-Collapsed_tree"
+else
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $dir:/data pegi3s/phylogenetic-tree-collapser:$tree_collapse_docker_version collapse-tree.py --input /data/$input_dir/*.nwk --input-format newick --taxonomy /data/"$tc_taxonomy" --sequence-mapping /data/"$tc_stsm" --output /data/$prefix"1-Collapsed_tree"/$file_name.tree_collapsed --output-type phylogram --output-collapsed-nodes /data/$prefix"1-Collapsed_tree"/$file_name.collapsed_nodes --input-path-host $dir
+fi
+cp /data/$prefix"1-Collapsed_tree"/*.tree_collapsed /data/$out_dir
+cp /data/$prefix"1-Collapsed_tree"/*.collapsed_nodes /data/$out_dir	
+cp /data/$input_dir/*.nwk /data/$out_dir
+
+
+grep -oE '[A-Za-z_]+_[A-Za-z_]+_[A-Za-z_]+_[0-9_]+_[A-Z]+_[0-9_]+|[A-Za-z_]+_[0-9_]+:[0-9.]+' /data/$out_dir/*.tree_collapsed | sed 's/:.*//' > /data/$out_dir/tc_collapsed_headers
+
+nuc_aligned_file=$(find /data/ -type f -name "*.nuc_aligned" | head -n 1)
+
+output_file="/data/$out_dir/selected_sequences"
+
+if [[ -n $interest_species && -s "/data/$interest_species" ]]; then
+    readarray -t species_of_interest < "/data/$interest_species"
+else
+    species_of_interest=()
+fi
+
+while IFS= read -r header; do
+    if grep -q -A1 "^>$header" $nuc_aligned_file; then
+        grep -A1 "^>$header" $nuc_aligned_file >> $output_file
+    else
+        mapfile -t related_nodes < <(grep "$header" /data/$out_dir/*.collapsed_nodes | awk '{print $2}')
+        mapfile -t to_add < <(grep "$header" /data/$out_dir/*.collapsed_nodes | awk '{print $1}' | sed  's/^/_/g')
+        sequence_added=false
+        for node in "${related_nodes[@]}"; do
+            for species in ${species_of_interest[@]}; do
+                if [[ $node == *"$species"* ]] && grep -q -A1 "^>$node" $nuc_aligned_file; then
+                    grep -A1 "^>$node" $nuc_aligned_file >> $output_file
+                    tac $output_file | sed "2s/$/$to_add/" | tac  > output_file_tmp
+                    rm $output_file && mv output_file_tmp $output_file
+                    sequence_added=true
+                fi
+            done
+        done
+        if [[ ${#species_of_interest[@]} -eq 0 || $sequence_added == false ]]; then
+            first_node=${related_nodes[0]}
+            grep -A1 "^>$first_node" $nuc_aligned_file >> $output_file
+            tac $output_file | sed "2s/$/$to_add/" | tac  > output_file_tmp
+            rm $output_file && mv output_file_tmp $output_file
+        fi
+    fi
+done < /data/$out_dir/tc_collapsed_headers
+
+case $tc_output in
+    1)
+        rm /data/$out_dir/tc_collapsed_headers
+        rm /data/$out_dir/selected_sequences
+        rm /data/$out_dir/*.nwk
+        ;;
+    2)
+        echo "Getting selected sequences"
+        mv /data/$out_dir/tc_collapsed_headers /data/$prefix"1-Collapsed_tree"
+        rm /data/$out_dir/*.tree_collapsed
+        rm /data/$out_dir/*.collapsed_nodes
+        rm /data/$out_dir/*.nwk
+        $start undo-alignment -id /data/$out_dir -od /data/$out_dir -rlb > /dev/null 2>&1
+        ;;
+esac
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*tree_collapse" "$versions_file"; then
+    echo "tree_collapse $tree_collapse_autop_version,pegi3s/phylogenetic-tree-collapser:$tree_collapse_docker_version,Phylogenetic Tree Collapser $tree_collapse_program_version,," >> "$versions_file"
+    echo ",pegi3s/seda:$tree_collapse_seda_docker_version,SEDA $tree_collapse_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+

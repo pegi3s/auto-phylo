@@ -1,0 +1,56 @@
+#!/bin/bash
+
+mafft_autop_version=3.0.0
+mafft_docker_version=7.505
+mafft_program_version=7.505
+mafft_seda_docker_version=1.6.1
+mafft_seda_program_version=1.6.1
+mafft_ref="Katoh K, Misawa K, Kuma K, Miyata T. (2002)"
+mafft_doi="10.1093/nar/gkf436"
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$mafft_docker_c_version" != "" ]; then
+	mafft_autop_version="?"
+	mafft_docker_version=$mafft_docker_c_version
+	mafft_program_version="?"
+	mafft_ref="?"
+	mafft_doi="?"
+fi
+
+if [ "$mafft_seda_docker_c_version" != "" ]; then
+	mafft_autop_version="?"
+	mafft_seda_docker_version=$mafft_seda_docker_c_version
+	mafft_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$mafft_seda_docker_version /opt/SEDA/run-cli.sh")
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Aligning nucleotide sequences with Mafft"
+mkdir -p /data/$prefix"1-mafft_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/mafft:$mafft_docker_version bash -c " mafft /data/$input_dir/$file_name > /data/$prefix"1-mafft_sequence_alignment"/$file_name.nuc_aligned" > /dev/null 2>&1
+$start reformat -id /data/$prefix"1-mafft_sequence_alignment" -od /data/$prefix"1-mafft_sequence_alignment" -rlb
+mkdir -p  /data/$out_dir
+cp /data/$prefix"1-mafft_sequence_alignment"/*.nuc_aligned /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Mafft" "$versions_file"; then
+    echo "Mafft $mafft_autop_version,pegi3s/mafft:$mafft_docker_version,Mafft $mafft_program_version,\"$mafft_ref\",\"$mafft_doi\"" >> "$versions_file"
+    echo ",pegi3s/seda:$mafft_seda_docker_version,SEDA $mafft_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "mafft_ref=\"$mafft_ref\"\nmafft_doi=\"$mafft_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+
+	

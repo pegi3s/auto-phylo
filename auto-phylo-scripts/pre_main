@@ -1,0 +1,36 @@
+#!/bin/bash
+
+sed -i 's/\r//g' /data/pipeline
+sed -i 's/\r//g' /data/config
+
+check_pipeline=$(head -1 /data/pipeline)
+
+
+if [ "$check_pipeline" = "pipeline_drawing" ]; then
+    echo "Drawing the pipeline"
+    mkdir -p /data/files_to_keep
+    sed -i '1d' /data/pipeline
+    /opt/pipeline_drawing
+    sed -i '1 i\pipeline_drawing' /data/pipeline
+    rm -r /data/files_to_keep
+    
+elif [ "$check_pipeline" == "protocol_description" ]; then
+    echo "Please see the generated protocol description file"
+     wget http://evolution6.i3s.up.pt/static/pegi3s/dockerfiles/auto-phylo_protocols/protocol_description -P /data > /dev/null 2>&1
+    
+elif [[ "$check_pipeline" == *protocol* ]]; then
+    while read -r line; do
+        echo "Copying the protocol folder" $line
+        wget http://evolution6.i3s.up.pt/static/pegi3s/dockerfiles/auto-phylo_protocols/$line.zip -P /data > /dev/null 2>&1
+    done < /data/pipeline
+
+else
+    while read -r line; do
+            a=$(echo $line | awk '{print $1;}')
+            if [[ ! -f /opt/$a ]]; then
+                 echo "This is an invalid command:" $a
+                 exit
+            fi 
+    done < /data/pipeline
+    /opt/main
+fi

@@ -1,0 +1,53 @@
+#!/bin/bash
+
+clustalomega_autop_version=3.0.0
+clustalomega_docker_version=1.2.4
+clustalomega_program_version=1.2.4
+clustalomega_seda_docker_version=1.6.1
+clustalomega_seda_program_version=1.6.1
+clustalomega_ref="Sievers, F., & Higgins, D. G. (2014)"
+clustalomega_doi="10.1002/0471250953.bi0313s48"
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$clustalomega_docker_c_version" != "" ]; then
+	clustalomega_autop_version="?"
+	clustalomega_docker_version=$clustalomega_docker_c_version
+	clustalomega_program_version="?"
+	clustalomega_ref="?"
+	clustalomega_doi="?"
+fi
+
+if [ "$clustalomega_seda_docker_c_version" != "" ]; then
+	clustalomega_autop_version="?"
+	clustalomega_seda_docker_version=$clustalomega_seda_docker_c_version
+	clustalomega_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$clustalomega_seda_docker_version /opt/SEDA/run-cli.sh")
+
+file_name=$(cd /data/$input_dir && ls *)
+echo "Aligning nucleotide sequences with ClustalOmega"
+mkdir -p /data/$prefix"1-CO_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/clustalomega:$clustalomega_docker_version -i /data/$input_dir/$file_name -o /data/$prefix"1-CO_sequence_alignment"/$file_name.nuc_aligned
+$start reformat -id /data/$prefix"1-CO_sequence_alignment" -od /data/$prefix"1-CO_sequence_alignment" -rlb
+mkdir -p  /data/$out_dir
+cp /data/$prefix"1-CO_sequence_alignment"/*.nuc_aligned /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Clustal_Omega" "$versions_file"; then
+    echo "Clustal_Omega $clustalomega_autop_version,pegi3s/clustalomega:$clustalomega_docker_version,Clustal Omega $clustalomega_program_version,\"$clustalomega_ref\",\"$clustalomega_doi\"" >> "$versions_file"
+    echo ",pegi3s/seda:$clustalomega_seda_docker_version,SEDA $clustalomega_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "clustalomega_ref=\"$clustalomega_ref\"\nclustalomega_doi=\"$clustalomega_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

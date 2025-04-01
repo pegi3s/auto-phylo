@@ -1,0 +1,36 @@
+#!/bin/bash
+
+prefix_autop_version=3.0.0
+prefix_seda_docker_version=1.6.1
+prefix_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$prefix_seda_docker_c_version" != "" ]; then
+	prefix_autop_version="?"
+	prefix_seda_docker_version=$prefix_seda_docker_c_version
+	prefix_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$prefix_seda_docker_version /opt/SEDA/run-cli.sh")
+
+echo "Prefix sequences"
+mkdir -p /data/$prefix"1-Prefix" /data/$out_dir
+$start rename-header-add-word -id /data/$input_dir -od /data/$prefix"1-Prefix" -p prefix -s "C" -dl "_" -idl "" -ai
+cp /data/$prefix"1-Prefix"/* /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*prefix" "$versions_file"; then
+    echo "prefix $prefix_autop_version,pegi3s/seda:$prefix_seda_docker_version,SEDA $prefix_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

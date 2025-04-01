@@ -1,0 +1,71 @@
+#!/bin/bash
+
+check_contamination_autop_version=3.0.0
+check_contamination_seda_docker_version=1.6.1
+check_contamination_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$check_contamination_seda_docker_c_version" != "" ]; then
+	check_contamination_autop_version="?"
+	check_contamination_seda_docker_version=$check_contamination_seda_docker_c_version
+	check_contamination_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$check_contamination_seda_docker_version /opt/SEDA/run-cli.sh")
+
+if [ -z $check_cont_input_delete ]; then
+	check_cont_input_delete="no"
+fi
+if [ -z $check_cont_intermediate_delete  ]; then
+	check_cont_intermediate_delete="no"
+fi
+echo "Check for unwanted genomes"
+mkdir -p /data/$prefix"1-Contamination_check"/tmp
+cd /data/$input_dir
+for f in *; do
+	mv $f /data/$prefix"1-Contamination_check"/tmp
+	$start rename-ncbi -id /data/$prefix"1-Contamination_check"/tmp -od /data/$prefix"1-Contamination_check" -fp suffix -fd "_" -hp none -rbs -rsc -r "_" -nd "#" -itf $check_cont_taxonomy > /dev/null 2>&1
+	if [ $check_cont_input_delete == 'yes' ]; then
+		sed -i 'd' "/data/$prefix"1-Contamination_check"/tmp/$f"
+		mv /data/$prefix"1-Contamination_check"/tmp/$f /data/$input_dir
+	else
+		mv /data/$prefix"1-Contamination_check"/tmp/$f /data/$input_dir
+	fi
+	s=$(shuf -i 1-3 -n 1)
+	sleep $s
+done
+rm -r /data/$prefix"1-Contamination_check"/tmp
+cd /data
+mkdir -p /data/$out_dir /data/$prefix"2-Not_contaminated" /data/$prefix"3-Control_lists" /data/$prefix"4-Suspicious_Files"
+cd /data/$prefix"1-Contamination_check" && ls * > /data/$prefix"3-Control_lists"/original_list
+cd /data/$prefix"1-Contamination_check" && ls *\#$check_cont_category > /data/$prefix"3-Control_lists"/filtered_list
+cat /data/$prefix"3-Control_lists"/original_list /data/$prefix"3-Control_lists"/filtered_list | sort | uniq -u > /data/$prefix"3-Control_lists"/suspicious_list
+while read list; do
+	cp /data/$prefix"1-Contamination_check"/"$list" /data/$prefix"4-Suspicious_Files"
+done < /data/$prefix"3-Control_lists"/suspicious_list
+cp /data/$prefix"1-Contamination_check"/*\#$check_cont_category  /data/$out_dir
+if [ $check_cont_intermediate_delete != 'yes' ]; then
+	cp /data/$prefix"1-Contamination_check"/*\#$check_cont_category /data/$prefix"2-Not_contaminated"
+else
+	cd /data/$prefix"1-Contamination_check" && rm *
+fi
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*check_contamination" "$versions_file"; then
+    echo "check_contamination $check_contamination_autop_version,pegi3s/seda:$check_contamination_seda_docker_version,SEDA $check_contamination_seda_program_version,\"$seda_ref\",\"$seda_doi\""  >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+
+

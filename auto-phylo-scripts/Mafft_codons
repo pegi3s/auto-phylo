@@ -1,0 +1,98 @@
+#!/bin/bash
+
+mafft_codons_autop_version=3.0.0
+mafft_codons_docker_version=7.505
+mafft_codons_program_version=7.505
+mafft_codons_emboss_docker_version=6.6.0
+mafft_codons_emboss_program_version=6.6.0
+mafft_codons_translatorx_docker_version=01.09.2022
+mafft_codons_translatorx_program_version="https://translatorx.org"
+mafft_codons_seda_docker_version=1.6.1
+mafft_codons_seda_program_version=1.6.1
+mafft_ref="Katoh K, Misawa K, Kuma K, Miyata T. (2002)"
+mafft_doi="10.1093/nar/gkf436"
+emboss_ref="Rice, P., Longden, I., & Bleasby, A. (2000)"
+emboss_doi="10.1016/s0168-9525(00)02024-2"
+translatorx_ref="Abascal, F., Zardoya, R., & Telford, M. J. (2010)"
+translatorx_doi="10.1093/nar/gkq291"
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$mafft_codons_docker_c_version" != "" ]; then
+	mafft_codons_autop_version="?"
+	mafft_codons_docker_version=$mafft_codons_docker_c_version
+	mafft_codons_program_version="?"
+	mafft_ref="?"
+	mafft_doi="?"
+fi
+
+if [ "$mafft_codons_emboss_docker_c_version" != "" ]; then
+	mafft_codons_autop_version="?"
+	mafft_codons_emboss_docker_version=$mafft_codons_emboss_docker_c_version
+	mafft_codons_emboss_program_version="?"
+	emboss_ref="?"
+	emboss_doi="?"
+fi
+
+if [ "$mafft_codons_translatorx_docker_c_version" != "" ]; then
+	mafft_codons_autop_version="?"
+	mafft_codons_translatorx_docker_version=$mafft_codons_translatorx_docker_c_version
+	mafft_codons_translatorx_program_version="?"
+	translatorx_ref="?"
+	translatorx_doi="?"
+fi
+
+if [ "$mafft_codons_seda_docker_c_version" != "" ]; then
+	mafft_codons_autop_version="?"
+	mafft_codons_seda_docker_version=$mafft_codons_seda_docker_c_version
+	mafft_codons_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$mafft_codons_seda_docker_version /opt/SEDA/run-cli.sh")
+
+file_name=$(cd /data/$input_dir && ls *)
+
+mkdir -p /data/$prefix"1-mafft_translated_sequences"
+docker run --rm -v $dir:/data pegi3s/emboss:$mafft_codons_emboss_docker_version transeq -sequence /data/$input_dir/$file_name -outseq /data/$prefix"1-mafft_translated_sequences"/$file_name.pep
+$start reformat -id /data/$prefix"1-mafft_translated_sequences" -od /data/$prefix"1-mafft_translated_sequences" -rlb
+chmod -R 777 /data/$prefix"1-mafft_translated_sequences"/$file_name.pep
+cd /data/$prefix"1-mafft_translated_sequences"
+sed -i 's/_1$//g' /data/$prefix"1-mafft_translated_sequences"/$file_name.pep
+cd /data
+
+echo "Aligning amino acid sequences with Mafft"
+mkdir -p /data/$prefix"2-mafft_AA_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/mafft:$mafft_codons_docker_version bash -c "mafft /data/$prefix"1-mafft_translated_sequences"/$file_name.pep > /data/$prefix"2-mafft_AA_sequence_alignment"/$file_name.pep_aligned" > /dev/null 2>&1
+$start reformat -id /data/$prefix"2-mafft_AA_sequence_alignment" -od /data/$prefix"2-mafft_AA_sequence_alignment" -rlb
+
+echo "Creating a nucleotide alignment using the amino acid alignment as a guide"
+mkdir -p /data/$prefix"3-mafft_nuc_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/translatorx:$mafft_codons_translatorx_docker_version translatorx_vLocal.pl -i /data/$input_dir/$file_name -a /data/$prefix"2-mafft_AA_sequence_alignment"/$file_name.pep_aligned -o /data/$prefix"3-mafft_nuc_sequence_alignment"/$file_name.nuc_aligned > /dev/null 2>&1
+cd /data/$prefix"3-mafft_nuc_sequence_alignment"
+mv $file_name.nuc_aligned.nt_ali.fasta $file_name.nuc_aligned
+rm $file_name*ali.fasta
+cd /data
+mkdir -p  /data/$out_dir
+cp /data/$prefix"3-mafft_nuc_sequence_alignment"/*.nuc_aligned /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Mafft_codons" "$versions_file"; then
+    echo "Mafft_codons $mafft_codons_autop_version,pegi3s/mafft:$mafft_codons_docker_version,Mafft $mafft_codons_program_version,\"$mafft_ref\",\"$mafft_doi\"" >> "$versions_file"
+    echo ",pegi3s/emboss:$mafft_codons_emboss_docker_version,EMBOSS $mafft_codons_emboss_program_version,\"$emboss_ref\",\"$emboss_doi\"" >> "$versions_file"
+    echo ",pegi3s/translatorx ($mafft_codons_translatorx_docker_version),Translator X ($mafft_codons_translatorx_program_version),\"$translatorx_ref\",\"$translatorx_doi\"" >> "$versions_file"
+    echo ",pegi3s/seda:$mafft_codons_seda_docker_version,SEDA $mafft_codons_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "mafft_ref=\"$mafft_ref\"\nmafft_doi=\"$mafft_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "emboss_ref=\"$emboss_ref\"\nemboss_doi=\"$emboss_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "translatorx_ref=\"$translatorx_ref\"\ntranslatorx_ref=\"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

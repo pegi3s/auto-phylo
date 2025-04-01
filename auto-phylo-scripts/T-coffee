@@ -1,0 +1,41 @@
+#!/bin/bash
+
+tcoffee_autop_version=3.0.0
+tcoffee_docker_version=12.00.7
+tcoffee_program_version=12.00.7
+tcoffee_ref="Notredame, C., Higgins, D. G., & Heringa, J. (2000)"
+tcoffee_doi="10.1006/jmbi.2000.4042"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$tcoffee_docker_c_version" != "" ]; then
+	tcoffee_autop_version="?"
+	tcoffee_docker_version=$tcoffee_docker_c_version
+	tcoffee_program_version="?"
+	tcoffee_ref="?"
+	tcoffee_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Aligning sequences with T-coffee"
+mkdir -p /data/$prefix"1-T-coffee_sequence_alignment_Clustal"
+docker run --rm -v $dir:/data pegi3s/tcoffee t_coffee /data/$input_dir/$file_name -run_name /data/$prefix"1-T-coffee_sequence_alignment_Clustal"/$file_name.aln > /dev/null 2>&1
+echo "Converting to FASTA"
+mkdir -p /data/$prefix"2-T-coffee_FASTA_Conversion"
+touch /data/$prefix"2-T-coffee_FASTA_Conversion"/$file_name.aligned
+docker run --rm -v $dir:/data pegi3s/tcoffee:$tcoffee_docker_version t_coffee -other_pg seq_reformat -in /data/$prefix"1-T-coffee_sequence_alignment_Clustal"/$file_name.aln -output fasta > /data/$prefix"2-T-coffee_FASTA_Conversion"/$file_name.nuc_aligned
+mkdir -p  /data/$out_dir
+cp /data/$prefix"2-T-coffee_FASTA_Conversion"/$file_name.nuc_aligned /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*T-coffee" "$versions_file"; then
+    echo "T-coffee $tcoffee_autop_version,pegi3s/tcoffee:$tcoffee_docker_version,T-Coffee $tcoffee_program_version,\"$tcoffee_ref\",\"$tcoffee_doi\"" >> "$versions_file"
+fi
+
+echo -e "tcoffee_ref=\"$tcoffee_ref\"\ntcoffee_doi=\"$tcoffee_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

@@ -1,0 +1,37 @@
+#!/bin/bash
+
+fasttree_autop_version=3.0.0
+fasttree_docker_version=2.1.10
+fasttree_program_version=2.1.10
+fasttree_ref="Price, M. N., Dehal, P. S., & Arkin, A. P. (2009)"
+fasttree_doi="10.1093/molbev/msp077"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$fasttree_docker_c_version" != "" ]; then
+	fasttree_autop_version="?"
+	fasttree_docker_version=$fasttree_docker_c_version
+	fasttree_program_version="?"
+	fasttree_ref="?"
+	fasttree_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "ML tree inference using Fasttree"
+mkdir -p /data/$prefix"1-Fasttree_tree" /data/$out_dir
+docker run --rm -v $dir:/data pegi3s/fasttree:$fasttree_docker_version bash -c "FastTree -nt -gtr -gamma /data/$input_dir/$file_name > /data/$prefix"1-Fasttree_tree"/$file_name.tree" > /dev/null 2>&1
+cp /data/$prefix"1-Fasttree_tree"/$file_name.tree /data/$out_dir/$file_name.nwk
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Fasttree" "$versions_file"; then
+    echo "Fasttree $fasttree_autop_version,pegi3s/fasttree:$fasttree_docker_version,Fasttree $fasttree_program_version,\"$fasttree_ref\",\"$fasttree_doi\"" >> "$versions_file"
+fi
+
+echo -e "fasttree_ref=\"$fasttree_ref\"\nfasttree_doi=\"$fasttree_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+

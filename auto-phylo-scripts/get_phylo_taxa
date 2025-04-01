@@ -1,0 +1,48 @@
+#!/bin/bash
+
+get_phylo_taxa_autop_version=3.0.0
+get_phylo_taxa_seda_docker_version=1.6.1
+get_phylo_taxa_seda_program_version=1.6.1
+get_phylo_taxa_utilities_docker_version=0.22.2
+get_phylo_taxa_utilities_program_version=0.22.0
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$get_phylo_taxa_seda_docker_c_version" != "" ]; then
+	get_phylo_taxa_autop_version="?"
+	get_phylo_taxa_seda_docker_version=$get_phylo_taxa_seda_docker_c_version
+	get_phylo_taxa_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+if [ "$get_phylo_taxa_utilities_docker_c_version" != "" ]; then
+	get_phylo_taxa_autop_version="?"
+	get_phylo_taxa_utilities_docker_version=$get_phylo_taxa_utilities_docker_c_version
+	get_phylo_taxa_utilities_program_version="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$get_phylo_taxa_seda_docker_version /opt/SEDA/run-cli.sh")
+
+mkdir -p /data/$prefix"1-Phyloselected" /data/$out_dir
+echo "Getting sequences from phylogeny"
+docker run --rm -v $dir:/data pegi3s/utilities:$get_phylo_taxa_utilities_docker_version get_phylo_taxa $get_phylo_taxa_name1 $get_phylo_taxa_name2 /data/$input_dir/*.nuc_aligned /data/$input_dir/*.nwk > /dev/null 2>&1
+mv /data/$input_dir/*.excluding /data/$prefix"1-Phyloselected" > /dev/null 2>&1
+mv /data/$input_dir/*.only /data/$prefix"1-Phyloselected" > /dev/null 2>&1
+$start undo-alignment -id /data/$prefix"1-Phyloselected" -od /data/$prefix"1-Phyloselected" > /dev/null 2>&1
+cp /data/$prefix"1-Phyloselected"/*.only /data/$out_dir > /dev/null 2>&1
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*get_phylo_taxa" "$versions_file"; then
+    echo "get_phylo_taxa $get_phylo_taxa_autop_version,pegi3s/seda:$get_phylo_taxa_seda_docker_version,SEDA $get_phylo_taxa_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+    echo ",pegi3s/utilities:$get_phylo_taxa_utilities_docker_version,utilities $get_phylo_taxa_utilities_program_version,," >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

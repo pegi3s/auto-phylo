@@ -1,0 +1,36 @@
+#!/bin/bash
+
+add_refs_autop_version=3.0.0
+add_refs_seda_docker_version=1.6.1
+add_refs_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$add_refs_seda_docker_c_version" != "" ]; then
+	add_refs_autop_version="?"
+	add_refs_seda_docker_version=$add_refs_seda_docker_c_version
+	add_refs_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$add_refs_seda_docker_version /opt/SEDA/run-cli.sh")
+
+echo "Adding reference sequences"
+mkdir -p /data/$out_dir
+cp /data/$add_refs_reference /data/$input_dir
+$start merge -id /data/$input_dir -od /data/$out_dir -n "refseq_added" -rlb -lb unix -sc "original" > /dev/null 2>&1
+rm /data/$input_dir/$add_refs_reference
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*add_refs" "$versions_file"; then
+    echo "add_refs $add_refs_autop_version,pegi3s/seda:$add_refs_seda_docker_version,SEDA $add_refs_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

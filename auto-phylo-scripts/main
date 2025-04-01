@@ -1,0 +1,106 @@
+#!/bin/bash
+
+merge_autop_version=3.0.0
+
+. /data/config
+
+i=0
+q=1
+old_output=""
+mkdir -p /data/$project/intermediate_files/refs 	/data/files_to_keep
+cp /data/pipeline /data/files_to_keep
+cp /data/config /data/files_to_keep
+echo "Module version,Docker image version,Program version,Reference,DOI" > /data/files_to_keep/versions.csv
+/opt/pipeline_drawing
+mv /data/Pipeline.gv.svg /data/files_to_keep/Pipeline.svg
+while read command input output split dir_number; do
+	raw_input=$(echo $input)
+	raw_output=$(echo $output)
+	input=$(echo "$project"/$input)
+	output=$(echo "$project/"$output)
+	
+	if [ -d "/data/$project/$raw_input" ]; then
+            true
+        else
+            cp -r /data/$raw_input /data/$project
+        fi
+        
+	if [ "$old_output" != "$input" ]; then
+		i=$((i+1))
+		j=1
+	elif [ "$old_output" = "" ]; then
+		i=1
+		j=1
+	else
+		j=$((j+1))
+	fi
+	
+	prefix=$(echo "$project/intermediate_files/""B"$i"C"$j"/B"$i"C"$j"-")
+	echo $command $raw_input $raw_output $split $dir_number "B"$i"C"$j >> /data/$project/intermediate_files/blocks_and_commands
+	if [ "$split" = "split" ] && [ "$command" != "Clustal_Omega" ] && [ "$command" != "Clustal_Omega_codons" ] && [ "$command" != "merge" ] && [ "$command" != "T-coffee" ] && [ "$command" != "T-coffee_codons" ] &&  [ "$command" != "Mafft" ] && [ "$command" != "Mafft_codons" ] && [ "$command" != "Probcons" ] && [ "$command" != "Probcons_codons" ] && [ "$command" != "Probcons_refinement" ] && [ "$command" != "add_refs" ] && [ "$command" != "compare_accessions" ] && [ "$command" != "compare_data_summary" ] && [ "$command" != "copy_data_summary" ] && [ "$command" != "data_summary" ] && [ "$command" != "Fastroot" ] && [ "$command" != "Fasttree" ] && [ "$command" != "getlist" ] && [ "$command" != "get_phylo_taxa" ] && [ "$command" != "ipssa" ] && [ "$command" != "JModel_test" ] && [ "$command" != "kaks" ] && [ "$command" != "me_tree" ] && [ "$command" != "ml_tree" ] && [ "$command" != "mp_tree" ] && [ "$command" != "MrBayes" ] && [ "$command" != "Muscle" ] && [ "$command" != "Muscle_codons" ] && [ "$command" != "ncbi_retrieve" ] && [ "$command" != "nj_tree" ] && [ "$command" != "phipack" ] && [ "$command" != "pipeline_drawing" ] && [ "$command" != "raxml" ] && [ "$command" != "Rootdigger" ] && [ "$command" != "species_list" ] && [ "$command" != "tree_collapse" ] && [ "$command" != "upgma_tree" ] && [ "$command" != "view_trees" ]; then
+		/opt/split $input $dir_number
+		for n in $( eval echo {1..$dir_number} );  do
+			a=$(echo $command $input.$n $output $prefix"R"$n"-")
+			/opt/$a
+			rm -rf /data/$input.$n
+		done
+	split=""
+	else
+		a=$(echo ./$command $input $output $prefix)
+		/opt/$a	
+	fi
+	old_output=$output
+	
+	if    [ "$command" == "JModel_test" ] || [ "$command" == "Probcons_refinement" ] || [ "$command" == "ipssa" ] || [ "$command" == "kaks" ] || [ "$command" == "getlist" ] || [ "$command" == "get_phylo_taxa" ] || [ "$command" == "view_trees" ]; then
+		cp /data/$output/* /data/files_to_keep/$q.$command."B"$i"C"$j
+		q=$((q+1))
+	fi	
+	if    [ "$command" == "data_summary" ] ; then
+		cp /data/$output/counts /data/files_to_keep/$q.$command.$raw_output.counts."B"$i"C"$j
+		cp /data/$output/species_list /data/files_to_keep/$q.$command.$raw_output.species_list."B"$i"C"$j
+		q=$((q+1))
+	fi	
+	if    [ "$command" == "compare_data_summary" ] ; then
+		cp /data/$output/common_species /data/files_to_keep/$q.$command.$raw_output.common_species."B"$i"C"$j
+		cp /data/$output/different_species /data/files_to_keep/$q.$command.$raw_output.different_species."B"$i"C"$j
+		cp /data/$output/species_comparison /data/files_to_keep/$q.$command.$raw_output.species_comparison."B"$i"C"$j	
+		q=$((q+1))
+	fi			
+	if [ "$command" == "Fastroot" ] || [ "$command" == "Fasttree" ] || [ "$command" == "MrBayes" ] || [ "$command" == "me_tree" ] || [ "$command" == "ml_tree" ] || [ "$command" == "mp_tree" ] || [ "$command" == "nj_tree" ] || [ "$command" == "upgma_tree" ] || [ "$command" == "Rootdigger" ]; then
+		cp /data/$output/*.nwk /data/files_to_keep/$q.$command."B"$i"C"$j
+			if [ "$command" == "MrBayes" ] ; then
+			    cp /data/$project/intermediate_files/"B"$i"C"$j/"B"$i"C"$j"-2-MrBayes"/log /data/files_to_keep/$q.$command.log."B"$i"C"$j
+			fi
+		q=$((q+1))
+	fi
+	if [ "$command" == "Clustal_Omega" ] || [ "$command" == "Clustal_Omega_codons" ] || [ "$command" == "T-coffee" ] || [ "$command" == "T-coffee_codons" ] || [ "$command" == "Mafft" ] || [ "$command" == "Mafft_codons" ] || [ "$command" == "Probcons" ] || [ "$command" == "Probcons_codons" ] || [ "$command" == "Muscle_codons" ] || [ "$command" == "Muscle" ]; then
+		cp /data/$output/*aligned /data/files_to_keep/$q.$command."B"$i"C"$j
+		q=$((q+1))
+	fi
+	if [ "$command" == "tree_collapse" ]; then
+	  if [[ -f /data/$output/selected_sequences ]]; then
+	        cp /data/$output/selected_sequences /data/files_to_keep/$q.$command."B"$i"C"$j
+	        q=$((q+1))
+	  else
+		cp /data/$output/*collapsed_nodes /data/files_to_keep/$q.$command.nodes."B"$i"C"$j
+		cp /data/$output/*tree_collapsed /data/files_to_keep/$q.$command.tree."B"$i"C"$j
+		q=$((q+1))
+          fi
+	fi
+	if [ "$command" == "compare_accessions" ]; then
+		cp /data/$output/acc_numbers_comparison /data/files_to_keep/$q.$command."B"$i"C"$j
+		q=$((q+1))
+	fi
+	
+done < /data/pipeline
+cp /data/$project/intermediate_files/blocks_and_commands /data/files_to_keep
+/opt/pipeline_summary
+
+for file in /data/*; do
+    filename=$(basename "$file")
+    if [ -e "/data/$project/$filename" ]; then
+        rm -r "/data/$project/$filename"
+    fi
+done
+
+

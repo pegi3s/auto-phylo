@@ -1,0 +1,41 @@
+#!/bin/bash
+
+compare_accessions_autop_version=3.0.0
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+echo "Comparing accession lists"
+mkdir -p /data/$out_dir /data/$prefix"1-Comparing_acc_lists"
+
+list1=$comp_acc_previous_list
+list2=($(ls /data/$input_dir | head -1))
+
+cat /data/$list1 /data/$input_dir/$list2 | sort > /data/$out_dir/sorted_combined_list
+uniq -u /data/$out_dir/sorted_combined_list > /data/$out_dir/different_accessions
+cut -f1 -d'.' /data/$out_dir/different_accessions | sort | uniq -d  > /data/$out_dir/different_versions
+while read list; do
+    grep $list /data/$out_dir/different_accessions |  tr "\n" " "  >> /data/$out_dir/different_versions_1
+    sed -i "/^$list\./d" /data/$out_dir/different_accessions
+done <  /data/$out_dir/different_versions
+
+{
+    echo "These accession numbers are different between $list1 and $list2:"
+    cat /data/$out_dir/different_accessions
+    echo ""
+    echo "There are different accession number versions when comparing $list2 and $list1 for:"
+    cat /data/$out_dir/different_versions_1
+    
+} > /data/$out_dir/acc_numbers_comparison
+
+rm -r /data/$out_dir/sorted_combined_list /data/$out_dir/different_accessions /data/$out_dir/different_versions /data/$out_dir/different_versions_1
+cp /data/$out_dir/* /data/$prefix"1-Comparing_acc_lists"
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*compare_accessions" "$versions_file"; then
+    echo "compare_accessions $compare_accessions_autop_version,,," >> "$versions_file"
+fi

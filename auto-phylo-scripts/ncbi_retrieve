@@ -1,0 +1,39 @@
+#!/bin/bash
+
+ncbi_retrieve_autop_version=3.0.0
+ncbi_retrieve_docker_version=1.0.1
+ncbi_retrieve_program_version=1.0.1
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$ncbi_retrieve_docker_c_version" != "" ]; then
+	ncbi_retrieve_autop_version="?"
+	ncbi_retrieve_docker_version=$ncbi_retrieve_docker_c_version
+	ncbi_retrieve_program_version="?"
+fi
+
+echo "Retrieving files"
+mkdir -p /data/$out_dir /data/$prefix"1-accessions"
+if [ -z "$include" ]; then
+    a=$(echo "docker run --rm -v $dir/$input_dir:/data -v /var/run/docker.sock:/var/run/docker.sock pegi3s/ncbi_retrieve:$ncbi_retrieve_docker_version -db $database_type -path $dir/$input_dir")
+    $a > /dev/null 2>&1
+else
+    b=$(echo "docker run --rm -v $dir/$input_dir:/data -v /var/run/docker.sock:/var/run/docker.sock pegi3s/ncbi_retrieve:$ncbi_retrieve_docker_version -db $database_type -inc $include -path $dir/$input_dir")
+    $b > /dev/null 2>&1
+fi
+
+mv /data/$input_dir/intermediate/log_file.txt /data/$prefix"1-accessions" > /dev/null 2>&1
+find /data/$input_dir/out_dir -size 0 -print -delete > /dev/null 2>&1
+mv /data/$input_dir/out_dir/* /data/$out_dir > /dev/null 2>&1
+rm -r /data/$input_dir/intermediate /data/$input_dir/out_dir > /dev/null 2>&1
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*ncbi_retrieve" "$versions_file"; then
+    echo "ncbi_retrieve $ncbi_retrieve_autop_version,pegi3s/ncbi_retrieve:$ncbi_retrieve_docker_version,ncbi_retrieve $ncbi_retrieve_program_version,," >> "$versions_file"
+fi
+

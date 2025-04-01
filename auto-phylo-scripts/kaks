@@ -1,0 +1,55 @@
+#!/bin/bash
+
+kaks_autop_version=3.0.0
+kaks_docker_version=2.0
+kaks_program_version=2.0
+kaks_seda_docker_version=1.6.1
+kaks_seda_program_version=1.6.1
+kaks_ref="Wang D, Zhang Y, Zhang Z, Zhu J, Yu J. (2010)"
+kaks_doi="10.1016/S1672-0229(10)60008-3"
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$kaks_docker_c_version" != "" ]; then
+	kaks_autop_version="?"
+	kaks_docker_version=$kaks_docker_c_version
+	kaks_program_version="?"
+	kaks_ref="?"
+	kaks_doi="?"
+fi
+
+if [ "$kaks_seda_docker_c_version" != "" ]; then
+	kaks_autop_version="?"
+	kaks_seda_docker_version=$kaks_seda_docker_c_version
+	kaks_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data -v /var/run/docker.sock:/var/run/docker.sock -v /tmp:/tmp pegi3s/seda:$kaks_seda_docker_version /opt/SEDA/run-cli.sh")
+
+echo "KaKs Calculator"
+mkdir -p /data/$out_dir /data/$prefix"1-KaKs"
+file_name=$(cd /data/$input_dir && ls *)
+$start reformat -id /data/$input_dir -od /data/$input_dir -rlb > /dev/null 2>&1
+docker run --rm -v $dir/$input_dir:/data pegi3s/kakscalculator:$kaks_docker_version bash -c "FASTA-AXT /data/$file_name && KaKs_Calculator -i /data/$file_name.axt -o /data/$file_name.axt.kaks -m $kaks_model -c $kaks_genetic_code" > /dev/null 2>&1
+cp /data/$input_dir/*.axt /data/$prefix"1-KaKs"
+cp /data/$input_dir/*.kaks /data/$out_dir
+rm /data/$input_dir/{*.axt,*.kaks}
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*kaks" "$versions_file"; then
+    echo "kaks $kaks_autop_version,pegi3s/kakscalculator:$kaks_docker_version,KaKs Calculator $kaks_program_version,\"$kaks_ref\",\"$kaks_doi\"" >> "$versions_file"
+    echo ",pegi3s/seda:$kaks_seda_docker_version,SEDA $kaks_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "kaks_ref=\"$kaks_ref\"\nkaks_doi=\"$kaks_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references	
+

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+jmodeltest_autop_version=3.0.0
+jmodeltest_docker_version=2.1.10
+jmodeltest_program_version=2.1.10
+jmodeltest_seda_docker_version=1.6.1
+jmodeltest_seda_program_version=1.6.1
+jmodeltest_ref="Darriba, D., Taboada, G. L., Doallo, R., & Posada, D. (2012)"
+jmodeltest_doi="10.1038/nmeth.2109"
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$jmodeltest_docker_c_version" != "" ]; then
+	jmodeltest_autop_version="?"
+	jmodeltest_docker_version=$jmodeltest_docker_c_version
+	jmodeltest_program_version="?"
+	jmodeltest_ref="?"
+	jmodeltest_doi="?"
+fi
+
+if [ "$jmodeltest_seda_docker_c_version" != "" ]; then
+	jmodeltest_autop_version="?"
+	jmodeltest_seda_docker_version=$jmodeltest_seda_docker_c_version
+	jmodeltest_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$jmodeltest_seda_docker_version /opt/SEDA/run-cli.sh")
+
+file_name=$(cd /data/$input_dir && ls *)
+
+
+echo "Running J-model test"
+mkdir -p /data/$prefix"1-Header_rename" /data/$prefix"2-J-model_test" /data/$out_dir
+$start rename-header-replace-word -id /data/$input_dir -od /data/$prefix"1-Header_rename" -ht "all" -tw "[^0-9,a-z,A-Z]" -r -rp "_" > /dev/null 2>&1
+docker run --rm -v $dir:/data pegi3s/jmodeltest2:$jmodeltest_docker_version java -jar /jmodeltest2/dist/jModelTest.jar -d /data/$prefix"1-Header_rename"/$file_name -g 4 -i -f -AIC -BIC -a -o /data/$prefix"2-J-model_test"/$file_name.AIC
+cp /data/$prefix"2-J-model_test"/* /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*JModel_test" "$versions_file"; then
+    echo "JModel_test $jmodeltest_autop_version,pegi3s/jmodeltest2:$jmodeltest_docker_version,JModel Test $jmodeltest_program_version,\"$jmodeltest_ref\",\"$jmodeltest_doi\"" >> "$versions_file"
+    echo ",pegi3s/seda:$jmodeltest_seda_docker_version,SEDA $jmodeltest_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "jmodeltest_ref=\"$jmodeltest_ref\"\njmodeltest_doi=\"$jmodeltest_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

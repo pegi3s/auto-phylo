@@ -1,0 +1,41 @@
+#!/bin/bash
+
+merge_autop_version=3.0.0
+merge_seda_docker_version=1.6.1
+merge_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$merge_seda_docker_c_version" != "" ]; then
+	merge_autop_version="?"
+	merge_seda_docker_version=$merge_seda_docker_c_version
+	merge_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$merge_seda_docker_version /opt/SEDA/run-cli.sh")
+
+mkdir -p /data/$prefix"1-merge_files"
+echo "Merging files"
+$start merge -id /data/$input_dir -od /data/$prefix"1-merge_files" -n "merge_output" -rlb -lb unix -sc "original"
+mkdir -p /data/$out_dir /data/$prefix"2-redundant_sequences"
+echo "Removing redundant sequences"
+$start remove-redundant -id /data/$prefix"1-merge_files" -od /data/$out_dir -rs -smh /data/$prefix"2-redundant_sequences"
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*merge" "$versions_file"; then
+    echo "merge $merge_autop_version,pegi3s/seda:$merge_seda_docker_version,SEDA $merge_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+
+
+

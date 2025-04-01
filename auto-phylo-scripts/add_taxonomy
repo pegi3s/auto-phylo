@@ -1,0 +1,57 @@
+#!/bin/bash
+
+add_taxonomy_autop_version=3.0.0
+add_taxonomy_seda_docker_version=1.6.1
+add_taxonomy_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$add_taxonomy_seda_docker_c_version" != "" ]; then
+	add_taxonomy_autop_version="?"
+	add_taxonomy_seda_docker_version=$add_taxonomy_seda_docker_c_version
+	add_taxonomy_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$add_taxonomy_seda_docker_version /opt/SEDA/run-cli.sh")
+
+echo "Adding taxonomy information"
+mkdir -p /data/$prefix"1-Add_taxonomy"/tmp /data/$out_dir
+taxonomy_header_1=$(echo $add_tax_taxonomy_header | sed "s/ / \-itf /g")
+cd /data/$input_dir
+for f in *; do
+	mv $f /data/$prefix"1-Add_taxonomy"/tmp
+	$start rename-ncbi -id /data/$prefix"1-Add_taxonomy"/tmp -od /data/$out_dir -hp prefix -hd '_' -rbs -rsc -r "_" -nd "_" -itf $taxonomy_header_1 > /dev/null 2>&1
+	mv /data/$prefix"1-Add_taxonomy"/tmp/$f /data/$input_dir
+	s=$(shuf -i 1-3 -n 1)
+	sleep $s
+done
+$start rename-header-replace-interval -id /data/$out_dir -od /data/$out_dir -ht "all" -fr "(" -to ")" -ir ""
+$start rename-header-replace-word -id /data/$out_dir -od /data/$out_dir -ht "all" -tw "\." -r -rp "_"
+$start rename-header-replace-word -id /data/$out_dir -od /data/$out_dir -ht "all" -tw "__" -r -rp "_"
+rmdir /data/$prefix"1-Add_taxonomy"/tmp
+cd /data
+cd /data/$input_dir && ls * > /data/$prefix"1-Add_taxonomy"/original_list
+cd /data/$out_dir && ls * > /data/$prefix"1-Add_taxonomy"/final_list
+cat /data/$prefix"1-Add_taxonomy"/original_list /data/$prefix"1-Add_taxonomy"/final_list | sort | uniq -d > /data/$prefix"1-Add_taxonomy"/unprocessed_list
+mkdir /data/$prefix"2-Files_that_failed"
+while read list; do
+	cp /data/$input_dir/"$list" /data/$prefix"2-Files_that_failed"
+	rm /data/$out_dir/"$list"
+done < /data/$prefix"1-Add_taxonomy"/unprocessed_list
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*add_taxonomy" "$versions_file"; then
+    echo "add_taxonomy $add_taxonomy_autop_version,pegi3s/seda:$add_taxonomy_seda_docker_version,SEDA $add_taxonomy_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+

@@ -1,0 +1,543 @@
+#!/bin/bash
+
+pipeline_summary_autop_version=3.0.0
+
+. /data/config
+touch /data/$project/intermediate_files/refs/tmp_references
+. /data/$project/intermediate_files/refs/tmp_references
+
+mkdir -p /data/$project/intermediate_files/refs
+
+echo "Creating the pipeline summary"
+
+pipeline_file=$(find /data/ -name "pipeline" -type f -print -quit)
+
+num_lines_pipeline=$(wc -l < $pipeline_file)
+
+autophylo_ref="López-Fenández, H., Pinto, M., Vieira, C.P., Duque, P., Reboiro-Jato, M., Vieira, J. (2023)"
+autophylo_doi="10.1007/978-3-031-38079-2_3"
+echo "Auto-Phylo: \"$autophylo_doi\", \"$autophylo_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+echo "Auto-Phylo: \"$autophylo_ref\", \"$autophylo_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+
+process_pipeline() {
+    local suffix=$1
+
+    local autophylo_var alter_var bioconvert_var clustalomega_var emboss_var fastroot_var fasttree_var ipssa_var jmodeltest_var kaks_var mafft_var megaxcc_var mrbayes_var muscle_var phipack_var probcons_var raxml_var rootdigger_var seda_var tcoffee_var translatorx_var newick_utils_var
+
+    local varname
+    for varname in autophylo alter bioconvert clustalomega emboss fastroot fasttree ipssa jmodeltest kaks mafft megaxcc mrbayes muscle phipack probcons raxml rootdigger seda tcoffee translatorx newick_utils; do
+        local ref=${varname}_ref
+        local doi=${varname}_doi
+        declare -n refvar="$varname"_var
+        if [ $suffix == "ref" ]; then
+            refvar=${!ref}
+        else
+            refvar=${!doi}
+        fi
+    done
+
+    local summary_file="/data/files_to_keep/pipeline_summary_${suffix}"
+
+current_date=$(date +"%d-%m-%Y")
+
+echo "                                                          Auto-Phylo Pipeline Summary" >> $summary_file
+echo >> $summary_file
+echo "================================================================================" >> $summary_file
+echo >> $summary_file
+echo "This pipeline was run on the $current_date using the auto-phylo software ($autophylo_var) that is available as a Docker image at the pegi3s Bioinformatics Docker Images Project 'https://pegi3s.github.io/dockerfiles/'. During this run $num_lines_pipeline modules were used. The pipeline summary is presented below. Detailed information on each module can be found at the auto-phylo website: 'http://evolution6.i3s.up.pt/static/auto-phylo/v3/docs/index.html'." >> $summary_file
+
+while read -r line; do
+    module=$(echo $line | awk '{print $1}')
+    input_p=$(echo $line | awk '{print $2}')
+    output_p=$(echo $line | awk '{print $3}')
+    
+    if [ -d "/data/$project/$input_p" ]; then
+       nr_files_input_p=$(find "/data/$project/$input_p" -type f | wc -l)
+    fi
+    
+    if [ -d "/data/$project/$output_p" ]; then
+       nr_files_output_p=$(find "/data/$project/$output_p" -type f | wc -l)
+    fi
+
+    # split
+    split_used=$(echo $line | awk '{print $4}')
+    nr_folders=$(echo $line | awk '{print $5}')
+    
+    split_text=""
+    if [[ $split_used == "split" ]]; then
+        split_text=" Along with this module, the split module was also used which divided the input directory files into $nr_folders equally sized subfolders and each was processed individually to avoid computer overload."
+    fi
+
+# DATA ACQUISITION
+
+    if [ $module = "ncbi_retrieve" ]; then
+    	file_path=$(find "/data/$project/$input_p" -type f | head -n 1)
+    	if [ -f $file_path ]; then
+            lines=$(wc -l < $file_path)
+            if [ $include = "GENOME_FASTA" ]; then
+                include_text="genome FASTA"
+            elif [ $include = "GENOME_GFF" ]; then
+                include_text="genome GFF format"
+            elif [ $include = "RNA_FASTA" ]; then
+                include_text="RNA FASTA"
+            elif [ $include = "CDS_FASTA" ]; then
+                include_text="CDS FASTA"
+            elif [ $include = "PROT_FASTA" ]; then
+                include_text="protein FASTA"
+            elif [ $include = "SEQUENCE_REPORT" ]; then
+                include_text="a report of the"
+            fi
+        
+            if [ $database_type = "assembly" ]; then
+                echo "The $module module accepted as input a file from the '$input_p' directory with $lines NCBI accession numbers to be considered but only $include_text sequences were downloaded. The output files ($nr_files_output_p) were generated in the '$output_p' directory along with a log file containing the sequences download information for each accession number." >> $summary_file
+            elif [ $database_type = "nucleotide" ]; then
+                echo "The $module module accepted as input a file from the '$input_p' directory with $lines NCBI accession numbers to be considered. The output files ($nr_files_output_p) were generated in the '$output_p' directory along with a log file containing the sequences download information for each accession number." >> $summary_file
+            fi
+        fi
+    fi
+    if [ $module = "getlist" ]; then
+        file_path=$(find "/data/$project/$input_p" -type f | head -n 1)
+        if [ -f $file_path ]; then
+            line_count=$(wc -l < $file_path)
+        
+            if [ $line_count -eq 1 ]; then
+                input_file_text=$(cat $file_path)
+                echo "The $module module accepted as input a single file from the '$input_p' directory containing the following query: "$input_file_text". It then fetched the assembly data from the NCBI $getlist_db database and returned as output a file containing all the NCBI accession numbers available for that query in the specified database. The output files were generated in the '$output_p' directory." >> $summary_file
+            else
+                input_file_text=$(cat $file_path | tr '\n' ', ' | sed 's/, $//')
+                echo "The $module module accepted as input a single file from the '$input_p' directory containing the following queries: $input_file_text. It then fetched the assembly data from the NCBI $getlist_db database and returned as output a file for each query containing all the NCBI accession numbers available in the specified database. The output files were generated in the '$output_p' directory." >> $summary_file
+            fi
+        fi
+    fi
+    
+# BLAST Modules
+
+    if [ $module = "blastn" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and returned $nr_files_output_p FASTA files containing all the sequences that showed a significant blastn hit. The query file used was '$blastn_query' and the BLAST was run with a $blastn_expect expect value.$split_text The output files were generated in the '$output_p' directory." >> $summary_file
+    elif [ $module = "tblastn" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and returned $nr_files_output_p FASTA files containing all the sequences that showed a significant tblastn hit. The query file used was '$tblastn_query' and the BLAST was run with a $tblastn_expect expect value.$split_text The output files were generated in the '$output_p' directory." >> $summary_file
+    elif [ $module = "tblastx" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and returned $nr_files_output_p FASTA files containing all the sequences that showed a significant tblastx hit. The query file used was '$tblastx_query' and the BLAST was run with a $tblastx_expect expect value.$split_text The output files were generated in the '$output_p' directory." >> $summary_file
+    fi    
+        
+# FASTA FILE PROCESSING Modules
+
+    if [ $module = "add_refs" ]; then
+        path="/data/$add_refs_reference"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+            echo "The $module module accepted a single input FASTA file from the '$input_p' directory containing $num_sequences reference sequences to be added to the files located in the input directory.$split_text The output files were generated in the '$output_p' directory." >> $summary_file
+        fi
+    elif [ $module = "add_taxonomy" ]; then
+        echo "The $module module accepted as input $nr_files_input_p files from the '$input_p' directory and by quering the NCBI website with Entrez Direct (Kans J. (2013)), it added the respective "$add_tax_taxonomy_header" taxonomy to the headers of the FASTA files using SEDA-CLI ($seda_var) operations.$split_text The output files ($nr_files_output_p) were generated in the '$output_p' directory." >> $summary_file
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+    elif [ $module = "CDS_processing" ]; then
+        if [ "$cgf_cga_reformat_headers" == "y" ]; then  
+            echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and using SEDA-CLI ($seda_var) it implemented the following operations: 1) sequence headers were reformatted in order to keep only the scaffold and protein accession numbers, 2) sequences showing ambiguous nucleotides were removed; 3) only sequences showing a valid start codon, that do not have in frame stop codons, and that are multiple of three were kept, 4) stop codons were removed; 5) sequences showing a $CDS_processing_max_size_difference% size variation greater than the reference sequence ($CDS_processing_reference_file) were removed; 6) only sequences showing the '$CDS_processing_pattern' pattern were kept and 7) isoforms were removed.$split_text The output files ($nr_files_output_p) were generated in the '$output_p' directory." >> $summary_file
+        else
+            echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and using SEDA-CLI ($seda_var) it implemented the following operations: 1) sequences showing ambiguous nucleotides were removed; 2) only sequences showing a valid start codon, that do not have in frame stop codons, and that are multiple of three were kept, 3) stop codons were removed; 4) sequences showing a $CDS_processing_max_size_difference% size variation greater than the reference sequence ($CDS_processing_reference_file) were removed; 5) only sequences showing the '$CDS_processing_pattern' pattern were kept and 6) isoforms were removed.$split_text The output files ($nr_files_output_p) were generated in the '$output_p' directory." >> $summary_file
+        fi
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+    elif [ $module = "check_contamination" ]; then
+        diff=$((nr_files_output_p - nr_files_input_p))
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and added the "$check_cont_taxonomy" taxonomy to the name of each file in the input folder as a suffix using SEDA-CLI ($seda_var) operations. The value of this suffix was then compared to the value declared in the config file ($check_cont_category) and if there was a discrepancy then the file was considered a contaminant.$split_text The output files were generated in the '$output_p' directory and $diff contaminants were found." >> $summary_file   
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+    elif [ $module = "disambiguate" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and using SEDA-CLI ($seda_var) operations, it added an incremental suffix to identical sequence headers. The output files were generated in the '$output_p' directory." >> $summary_file
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi    
+    elif [ $module = "merge" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and merged all of them into a single file and removed redundant identical sequences or sub-sequences. The output file was generated in the '$output_p' directory." >> $summary_file
+    elif [ $module = "prefix" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and it added a prefix to the sequence headers. The output files were generated in the '$output_p' directory." >> $summary_file
+    elif [ $module = "prefix_out" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and it removed the prefixes that were added by the prefix module. The output files were generated in the '$output_p' directory." >> $summary_file
+    elif [ $module = "remove_stops" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and using SEDA-CLI ($seda_var) operations, it removed sequences stop codons.$split_text The output files were generated in the '$output_p' directory." >> $summary_file
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+    elif [ $module = "species_list" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory (sequence headers starts with the organism name) and returned as output a list with the names of all the unique species present in the headers of the input files and also a list with the total counts of how many times each species appear in the input files headers.$split_text The output files were generated in the '$output_p' directory." >> $summary_file
+    elif [ $module = "species_list_genomes" ]; then
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and returned as output a list with the names of all the unique species present in the input files genomes and also a list with the total counts of how many times each species appear in the input files.$split_text The output files were generated in the '$output_p' directory." >> $summary_file
+    fi  
+  
+# ALIGNMENT Modules
+
+    if [ $module = "Clustal_Omega" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide FASTA file from the '$input_p' directory with $num_sequences sequences. SEDA-CLI ($seda_var) operations were performed to remove line breaks from sequences. Using the Clustal Omega ($clustalomega_var) program, a single sequence alignment FASTA file was created. The output file was generated in the '$output_p' directory." >> $summary_file  
+        echo "Clustal Omega: \"$clustalomega_doi\", \"$clustalomega_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "Clustal Omega: \"$clustalomega_ref\", \"$clustalomega_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "Clustal_Omega_codons" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)   
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single CDS FASTA file (sequences without stop codons) from the '$input_p' directory with $num_sequences sequences. The provided nucleotide sequences were first translated into amino acid sequences using the EMBOSS transeq feature ($emboss_var), and an amino acid alignment was obtained using Clustal Omega ($clustalomega_var). Then, the corresponding nucleotide alignment was obtained using TranslatorX ($translatorx_var). The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "EMBOSS: \"$emboss_doi\", \"$emboss_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "EMBOSS: \"$emboss_ref, \"$emboss_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "Clustal Omega: \"$clustalomega_doi\", \"$clustalomega_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "Clustal Omega: \"$clustalomega_ref\", \"$clustalomega_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "TranslatorX: \"$translatorx_doi\", \"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "TranslatorX: \"$translatorx_ref\", \"$translatorx_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "Mafft" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide FASTA file from the '$input_p' directory with $num_sequences sequences and using the MAFFT ($mafft_var) program, returned as output a single sequence alignment FASTA file. Additionally, SEDA-CLI ($seda_var) operations were performed in order to remove line breaks from the resulting alignment. The output file was generated in the '$output_p' directory." >> $summary_file  
+        echo "MAFFT: \"$mafft_doi\", \"$mafft_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MAFFT: \"$mafft_ref\", \"$mafft_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "Mafft_codons" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single CDS FASTA file (sequences without stop codons) from the '$input_p' directory with $num_sequences sequences and the provided nucleotide sequences were first translated into amino acid sequences using the EMBOSS transeq feature ($emboss_var), and an amino acid alignment was obtained using MAFFT ($mafft_var). Then, the corresponding nucleotide alignment was obtained using TranslatorX ($translatorx_var). Additionally, SEDA-CLI ($seda_var) operations were performed in order to remove line breaks from the resulting alignment. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "EMBOSS: \"$emboss_doi\", \"$emboss_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "EMBOSS: \"$emboss_ref\", \"$emboss_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "MAFFT: \"$mafft_doi\", \"$mafft_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MAFFT: \"$mafft_ref\", \"$mafft_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "TranslatorX: \"$translatorx_doi\", \"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "TranslatorX: \"$translatorx_ref, \"$translatorx_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "Probcons" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide FASTA file from the '$input_p' directory with $num_sequences sequences and using the PROBCONS ($probcons_var) program, returned as output a single sequence alignment FASTA file. Additionally, SEDA-CLI ($seda_var) operations were performed in order to reformat files. The output file was generated in the '$output_p' directory." >> $summary_file 
+        echo "ProbCons: \"$probcons_doi\", \"$probcons_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "ProbCons: \"$probcons_ref\", \"$probcons_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi  
+    elif [ $module = "Probcons_codons" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single CDS FASTA file (sequences without stop codons) from the '$input_p' directory with $num_sequences sequences and the provided nucleotide sequences were first translated into amino acid sequences using the EMBOSS transeq feature ($emboss_var), and an amino acid alignment was obtained using PROBCONS ($probcons_var). Then, the corresponding nucleotide alignment was obtained using TranslatorX ($translatorx_var). Additionally, SEDA-CLI ($seda_var) operations were performed in order to reformat files. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "EMBOSS: \"$emboss_doi\", \"$emboss_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "EMBOSS: \"$emboss_ref\", \"$emboss_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "ProbCons: \"$probcons_doi\", \"$probcons_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "ProbCons: \"$probcons_ref\", \"$probcons_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "TranslatorX: \"$translatorx_doi\", \"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "TranslatorX: \"$translatorx_ref\", \"$translatorx_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "Probcons_refinement" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *aligned)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single FASTA file from the '$input_p' directory containing $num_sequences aligned sequences and using the PROBCONS ($probcons_var) program refinement option with $probcons_refin_iterations iterations, returned a refined FASTA file. The output file was generated in the '$output_p' directory." >> $summary_file 
+        echo "ProbCons: \"$probcons_doi\", \"$probcons_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "ProbCons: \"$probcons_ref, \"$probcons_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi  
+    elif [ $module = "T-coffee" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide FASTA file from the '$input_p' directory with $num_sequences sequences and using the T-Coffee ($tcoffee_var) program, returned as output a single sequence alignment FASTA file. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "T-Coffee: \"$tcoffee_doi\", \"$tcoffee_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "T-Coffee: \"$tcoffee_ref\", \"$tcoffee_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    elif [ $module = "T-coffee_codons" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single CDS FASTA file (sequences without stop codons) from the '$input_p' directory with $num_sequences sequences and the provided nucleotide sequences were first translated into amino acid sequences using the EMBOSS transeq feature ($emboss_var), and an amino acid alignment was obtained using T-Coffee ($tcoffee_var). Then, the corresponding nucleotide alignment was obtained using TranslatorX ($translatorx_var). The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "EMBOSS: \"$emboss_doi\", \"$emboss_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "EMBOSS: \"$emboss_ref\", \"$emboss_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "T-Coffee: \"$tcoffee_doi\", \"$tcoffee_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "T-Coffee: \"$tcoffee_ref\", \"$tcoffee_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        echo "TranslatorX: \"$translatorx_doi\", \"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "TranslatorX: \"$translatorx_ref\", \"$translatorx_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "Muscle" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide FASTA file from the '$input_p' directory with $num_sequences sequences and using the MUSCLE ($muscle_var) program, returned as output a single sequence alignment FASTA file. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "MUSCLE: \"$muscle_doi\", \"$muscle_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MUSCLE: \"$muscle_ref\", \"$muscle_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "Muscle_codons" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single CDS FASTA file (sequences without stop codons) from the '$input_p' directory with $num_sequences sequences and the provided nucleotide sequences were first translated into amino acid sequences using the EMBOSS transeq feature ($emboss_var), and an amino acid alignment was obtained using MUSCLE ($muscle_var). Then, the corresponding nucleotide alignment was obtained using TranslatorX ($translatorx_var). The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "EMBOSS: \"$emboss_doi\", \"$emboss_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "EMBOSS: \"$emboss_ref\", \"$emboss_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "MUSCLE: \"$muscle_doi\", \"$muscle_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MUSCLE: \"$muscle_ref\", \"$muscle_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        echo "TranslatorX: \"$translatorx_doi\", \"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "TranslatorX: \"$translatorx_ref\", \"$translatorx_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    fi    
+    
+# TREE BUILDING Modules  
+ 
+    if [ $module = "get_phylo_taxa" ]; then
+        file_name=$(cd /data/$project/$output_p && ls *)
+        path="/data/$project/$output_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module was used to extract from the input Newick tree in the '$input_p' directory, all the taxa located in a given clade (delimited by '$get_phylo_taxa_name1' and '$get_phylo_taxa_name1') producing as output an unaligned FASTA file containing $num_sequences nucleotide sequences. Additionally, SEDA-CLI ($seda_var) operations were performed in order to reformat files. The output file was generated in the '$output_p' directory." >> $summary_file    
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref, \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi    
+        fi
+    elif [ $module = "Fasttree" ]; then
+        file_name=$(cd "/data/$project/$input_p" && ls *aligned)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide sequence alignment FASTA file from the '$input_p' directory with $num_sequences sequences and using the Fasttree ($fasttree_var) program it applied a generalized time-reversible model of nucleotide evolution with a proportion of invariant sites and a gamma distribution (GTR+I+G), returning as output a tree in Newick format. The output file was generated in the '$output_p' directory." >> $summary_file 
+        echo "FastTree: \"$fasttree_doi\", \"$fasttree_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "FastTree: \"$fasttree_ref\", \"$fasttree_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ "$module" = "Fastroot" ]; then
+        if [ "$fastroot_rooting_method" = "MV" ]; then
+            rooting_method="Minimum Variance Rooting"
+        elif [ "$fastroot_rooting_method" = "MP" ]; then
+            rooting_method="Midpoint Rooting"
+        else
+            rooting_method="Outgroup Rooting"
+        fi
+        echo "The $module module accepted as input one Newick tree file from the '$input_p' directory and using the FastRoot ($fastroot_var) program it rooted the tree using the $fastroot_rooting_method ($rooting_method), returning as output a rooted tree in Newick format. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "FastRoot: \"$fastroot_doi\", \"$fastroot_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "FastRoot: \"$fastroot_ref\", \"$fastroot_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+    elif [ $module = "me_tree" ]; then 
+        file_name=$(cd "/data/$project/$input_p" && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")  
+        echo "The $module module accepted as input a single nucleotide alignment in FASTA format from the '$input_p' directory with $num_sequences sequences and using the MegaX_CC ($megaxcc_var) program it returned a minimum evolution tree in Newick format using $me_tree_bootstrap bootstraps and the "$me_tree_treatment" option to treat the sites with alignment gaps. The output file was generated in the '$output_p' directory." >> $summary_file 
+        echo "MegaX_CC: \"$megaxcc_doi\", \"$megaxcc_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MegaX_CC: \"$megaxcc_ref\", \"$megaxcc_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    elif [ $module = "ml_tree" ]; then   
+        file_name=$(cd "/data/$project/$input_p" && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide alignment in FASTA format from the '$input_p' directory with $num_sequences sequences and using the MegaX_CC ($megaxcc_var) program it returned a maximum likelihood tree in Newick format using $ml_tree_bootstrap bootstraps and the $ml_tree_treatment option to treat the sites with alignment gaps. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "MegaX_CC: \"$megaxcc_doi\", \"$megaxcc_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MegaX_CC: \"$megaxcc_ref\", \"$megaxcc_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    elif [ $module = "mp_tree" ]; then  
+        file_name=$(cd "/data/$project/$input_p" && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path") 
+        echo "The $module module accepted as input a single nucleotide alignment in FASTA format from the '$input_p' directory with $num_sequences sequences and using the MegaX_CC ($megaxcc_var) program it returned a maximum parsimony tree in Newick format using $mp_tree_bootstrap bootstraps and the $mp_tree_treatment option to treat the sites with alignment gaps. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "MegaX_CC: \"$megaxcc_doi\", \"$megaxcc_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MegaX_CC: $megaxcc_ref, $megaxcc_doi" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    elif [ $module = "nj_tree" ]; then
+        file_name=$(cd "/data/$project/$input_p" && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")  
+        echo "The $module module accepted as input a single nucleotide alignment in FASTA format from the '$input_p' directory with $num_sequences sequences and using the MegaX_CC ($megaxcc_var) program it returned a neighbor-joining tree in Newick format using $nj_tree_bootstrap bootstraps and the $nj_tree_treatment option to treat the sites with alignment gaps. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "MegaX_CC: \"$megaxcc_doi\", \"$megaxcc_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MegaX_CC: \"$megaxcc_ref\", \"$megaxcc_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    elif [ $module = "upgma_tree" ]; then   
+        file_name=$(cd "/data/$project/$input_p" && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single nucleotide alignment in FASTA format from the '$input_p' directory with $num_sequences sequences and using the MegaX_CC ($megaxcc_var) program it returned an upgma tree in Newick format using $upgma_tree_bootstrap bootstraps and the $upgma_tree_treatment option to treat the sites with alignment gaps. The output file was generated in the '$output_p' directory." >> $summary_file 
+        echo "MegaX_CC: \"$megaxcc_doi\", \"$megaxcc_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MegaX_CC: \"$megaxcc_ref\", \"$megaxcc_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "MrBayes" ]; then 
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input a single CDS alignment FASTA file from the '$input_p' directory with $num_sequences sequences and using the MrBayes ($mrbayes_var) program it returned a tree in Newick format implemented using a generalized time-reversible model of nucleotide evolution with a proportion of invariant sites and an independent gamma distribution for first/second and third codon sites (GTR+I+G). The tree was produced using $mb_ngen generations and a burnin value of $mb_burnin. Please check the MrBayes log file in the 'files_to_keep' folder to see if convergence has been achieved (the final average standard deviation of split frequencies value should be smaller than 0.01 or PSRF values should approach 1.0 as runs converge). The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "MrBayes: \"$mrbayes_doi\", \"$mrbayes_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "MrBayes: \"$mrbayes_ref\", \"$mrbayes_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    elif [ $module = "raxml" ]; then 
+        file_name=$(cd /data/$project/$input_p && ls *aligned) 
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")  
+        echo "The $module module accepted as input a single nucleotide alignment in FASTA format from the '$input_p' directory with $num_sequences sequences and using the RaxML ($raxml_var) program it implemented a GTRGAMMAI model, returning as output a maximum likelihood phylogenetic tree in Newick format. The output file was generated in the '$output_p' directory." >> $summary_file 
+        echo "RaxML: \"$raxml_doi\", \"$raxml_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "RaxML: \"$raxml_ref\", \"$raxml_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi   
+        fi  
+    elif [ $module = "Rootdigger" ]; then 
+        file_name=$(cd "/data/$project/$input_p" && ls *aligned) 
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")  
+        echo "The $module module accepted as input a nucleotide alignment file in FASTA format from the '$input_p' directory with $num_sequences sequences as well as a Newick tree file with the corresponding tree and using the Root Digger ($rootdigger_var) program it produced a rooted tree with the $rootdigger_mode Root Digger mode. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "Root Digger: \"$rootdigger_doi\", \"$rootdigger_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "Root Digger: \"$rootdigger_ref\", \"$rootdigger_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi
+    elif [ $module = "view_trees" ]; then  
+        if [ "$vt_show_branch_length" = "y" ]; then
+            echo "The $module module accepted as input a Newick tree file from the '$input_p' directory and using the Newick Utilities ($newick_utils_var) program it returned an SVG file containing the phylogenetic tree representation showing the branch lenghts with a $vt_support_cutoff minimum support value and a $vt_show_branch_length branch length value. The output file was generated in the '$output_p' directory." >> $summary_file
+        else
+            echo "The $module module accepted as input a Newick tree file from the '$input_p' directory and using the Newick Utilities ($newick_utils_var) program it returned an SVG file containing the phylogenetic tree representation with a $vt_support_cutoff minimum support value. The output file was generated in the '$output_p' directory." >> $summary_file
+        fi
+        echo "Newick Utilities: \"$newick_utils_doi\", \"$newick_utils_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "Newick Utilities: \"$newick_utils_ref\", \"$newick_utils_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+    elif [ $module = "tree_collapse" ]; then   
+        echo "The $module module accepted as input a Newick tree file from the '$input_p' directory and using the Phylogenetic Tree Collapser program it returned a collapsed Newick tree. The output file was generated in the '$output_p' directory." >> $summary_file
+    fi    
+    
+# MODEL CHECKING Modules
+
+    if [ $module = "JModel_test" ]; then  
+        file_name=$(cd /data/$project/$input_p && ls *) 
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path") 
+        echo "The $module module accepted as input a nucleotide alignment in FASTA format from the '$input_p' directory with $num_sequences sequences and using the JModel test program ($jmodeltest_var) it produced a report to check whether the GTR+I+G model used by the Fasttree and MrBayes modules is appropriate. The output file was generated in the '$output_p' directory." >> $summary_file
+        echo "JModel test: \"$jmodeltest_doi\", \"$jmodeltest_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "JModel test: \"$jmodeltest_ref\", \"$jmodeltest_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi 
+        fi
+    fi
+        
+# GENE ANNOTATION Modules
+
+    if [ $module = "CGA" ]; then  
+        if [ $cga_selection_criterion = "1" ]; then
+            criterion_text="similarity with reference sequence first, in case of a tie, percentage of gaps relative to reference sequence"
+        elif [ $cga_selection_criterion = "2" ]; then
+            criterion_text="percentage of gaps relative to reference sequence first, in case of a tie, similarity with reference sequence"
+        else
+            criterion_text="mixed model with similarity with reference sequence first, but if fewer gaps relative to reference sequence, similarity gets a $cga_selection_correction% selection bonus correction"
+        fi
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and implemented the following steps: 1) a tblastn with a $cga_expect1 expect value, that using one or more protein sequences returns a FASTA file for each input file and protein used as query, containing all Blast hit regions plus a $cga_hit_region_window1 number of bases window around the hits; 2) a grow sequences step as implemented in SEDA-CLI ($seda_var) in order to merge sequences in the same file that show at least a $cga_min_overlap bases overlap; 3) then, the CGA pipeline (https://hub.docker.com/r/pegi3s/cga/) was used to perform CDS annotations, using as reference a single amino acid sequence. On this module, the parameters defined were: a $cga_max_dist bases maximum distance between exons from the same gene, a  $cga_intron_bp bases distance around the junction point between two sequences where to look for splicing signals, a $cga_min_full_nucleotide_size bases minimum size for reporting CDS and a selection model that was used based on a $criterion_text. The output files ($nr_files_output_p) were generated in the '$output_p' directory." >> $summary_file 
+        echo "SEDA: \"$seda_doi\", \"$seda_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "SEDA: \"$seda_ref\", \"$seda_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi           
+    fi
+    
+# DETECTION OF POSITIVELY SELECTED AMINO ACID SITES Modules
+
+    if [ $module = "ipssa" ]; then 
+        ipssa_sequence_limit="90"
+        ipssa_align_method="muscle"
+        ipssa_tcoffee_min_score="3"
+        ipssa_mrbayes_generations="1000000"
+        ipssa_mrbayes_burnin="2500"
+        ipssa_fubar_sequence_limit="90"
+        ipssa_fubar_runs="1"
+        ipssa_codeml_sequence_limit="30"
+        ipssa_codeml_runs="1"
+        ipssa_codeml_models="1, 2, 7 and 8"
+        ipssa_omegamap_sequence_limit="90"
+        ipssa_omegamap_iterations="2500"
+        [ -z "$var1" ] && var1=$default_var1
+        [ -z "$var2" ] && var2=$default_var2
+        [ -z "$var3" ] && var3=$default_var3
+        file_name=$(cd /data/$project/$input_p && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")
+        echo "The $module module accepted as input one CDS FASTA file with $num_sequences sequences from the '$input_p' directory and IPSSA ($ipssa_var) was used to automatically identify positively selected amino acid sites and check if there is evidence for recombination in the sequence data using PhiPack, returning as output a tabular formatted file containing the results of all selected PSS methods. The parameters used in this module were: maximum number of sequence to use for the master file was $ipssa_sequence_limit, the random seed used was $ipssa_random_seed, the alignment method used was $ipssa_align_method, the minimum support value for alignment positions was $ipssa_tcoffee_min_score, the number of iterations in MrBayes was $ipssa_mrbayes_generations and the burnin value was $ipssa_mrbayes_burnin, the maximum number of sequence to be used by FUBAR was $ipssa_fubar_sequence_limit and the number of independent replicas used by FUBAR was $ipssa_fubar_runs, the maximum number of sequence to be used by CodeML was $ipssa_codeml_sequence_limit, the number of independent replicas was $ipssa_codeml_runs and the CodeML models used were $ipssa_codeml_models, the maximum number of sequences to be used by omegaMap was $ipssa_omegamap_sequence_limit, the number of omegaMap iterations was $ipssa_omegamap_iterations and the number of independent replicas was $ipssa_omegamap_runs. The output file were generated in the '$output_p' directory." >> $summary_file
+        echo "ipssa: \"$ipssa_doi\", \"$ipssa_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "ipssa: \"$ipssa_ref\", \"$ipssa_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi  
+        fi
+    fi
+    
+# RECOMBINATION
+
+    if [ $module = "phipack" ]; then 
+        file_name=$(cd "/data/$project/$input_p" && ls *)
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")  
+        echo "The $module module accepted as input a single aligned FASTA file from the '$input_p' directory with $num_sequences sequences and using the PhiPack software ($phipack_var) it implemented tests for recombination (Pairwise Homoplasy Index (Phi), Maximum χ² (Max Chi²) and the Neighbour Similarity Score (NSS)) with $phipack_permutations permutations, returning as output a file containing the p-values for each test. The output files was generated in the '$output_p' directory." >> $summary_file
+        echo "PhiPack: \"$phipack_doi\", \"$phipack_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "PhiPack: \"$phipack_ref\", \"$phipack_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi
+        fi  
+    fi
+
+# DIVERGENCE ESTIMATES Modules
+
+    if [ $module = "kaks" ]; then
+        file_name=$(cd /data/$project/$input_p && ls *) 
+        path="/data/$project/$input_p/$file_name"
+        if [ -f "$path" ]; then
+            num_sequences=$(grep -c "^>" "$path")     
+        echo "The $module module accepted as input one FASTA file from the '$input_p' directory containing $num_sequences CDS sequences and using the KaKs calculator ($kaks_var) program, it calculated nonsynonymous (Ka) and synonymous (Ks) substitution rates by using the $kaks_model model and returned as output a tabular formatted file containing nonsynonymous and synonymous substitution rates, as well as other additional information. The output files were generated in the '$output_p' directory." >> $summary_file
+        echo "KaKs Calculator: \"$kaks_doi\", \"$kaks_ref\"" >> /data/$project/intermediate_files/refs/pipsum_ref
+        echo "KaKs Calculator: \"$kaks_ref\", \"$kaks_doi\"" >> /data/$project/intermediate_files/refs/pipsum_doi  
+        fi    
+    fi
+
+# Additional Modules
+
+    if [ $module = "data_summary" ]; then   
+        echo "The $module module accepted as input $nr_files_input_p FASTA files from the '$input_p' directory and returned as output one text file containing all the unique species present in the input files followed by $data_summary_taxonomy taxonomy and also a text file with the counts of each species in the specified taxonomy. The output files were generated in the '$output_p' directory." >> $summary_file
+    elif [ $module = "copy_data_summary" ]; then
+        echo "The $module module accepted as input the species list text file generated by the 'data_summary' module in the '$input_p' directory and copied it to the '$output_p' directory.">> $summary_file
+    elif [ $module = "compare_data_summary" ]; then
+        echo "The $module module accepted as input two species lists from the '$input_p' directory and compared them, generating as output three text files: one with the common species between both lists, one with the different species between both lists and the last one with the summary of both. The output files were generated in the '$output_p' directory.">> $summary_file
+    elif [ $module = "compare_accessions" ]; then
+        echo "The $module module accepted as input two text files containing only accession numbers (one in each line) and compared them, generating as output a text file indicating which of the accessions numbers are common and which are different between both lists. The output file was generated in the '$output_p' directory.">> $summary_file
+    fi    
+    
+done < $pipeline_file
+
+echo >> $summary_file
+echo "================================================================================" >> $summary_file
+echo >> $summary_file
+echo "This was the pipeline file used in this auto-phylo run:" >> $summary_file
+echo >> $summary_file
+cat $pipeline_file >> $summary_file
+echo >> $summary_file
+echo "================================================================================" >> $summary_file
+echo >> $summary_file
+
+}
+
+process_pipeline "ref"
+
+process_pipeline "doi"
+
+
+awk '!seen[$0]++' /data/$project/intermediate_files/refs/pipsum_ref > /data/$project/intermediate_files/refs/temp_ref && mv /data/$project/intermediate_files/refs/temp_ref /data/$project/intermediate_files/refs/pipsum_ref
+awk '!seen[$0]++' /data/$project/intermediate_files/refs/pipsum_doi > /data/$project/intermediate_files/refs/temp_doi && mv /data/$project/intermediate_files/refs/temp_doi /data/$project/intermediate_files/refs/pipsum_doi
+
+echo "References:" >> /data/files_to_keep/pipeline_summary_ref
+echo >> /data/files_to_keep/pipeline_summary_ref
+cat /data/$project/intermediate_files/refs/pipsum_ref >> /data/files_to_keep/pipeline_summary_ref
+
+echo "References:" >> /data/files_to_keep/pipeline_summary_doi
+echo >> /data/files_to_keep/pipeline_summary_doi
+cat /data/$project/intermediate_files/refs/pipsum_doi >> /data/files_to_keep/pipeline_summary_doi
+
+#rm /data/$project/intermediate_files/refs/pipsum_ref
+#rm /data/$project/intermediate_files/refs/pipsum_doi
+
+

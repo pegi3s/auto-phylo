@@ -210,7 +210,7 @@
     "params": {}
   },
   {
-    "tool": "FastRoot",
+    "tool": "Fastroot",
     "name": "Fastroot (SP) (Newick- Newick)",
     "url": "http://evolution6.i3s.up.pt/static/auto-phylo/v2/docs/modules_4_tree_building.html#Fastroot",
     "supports_special": false,

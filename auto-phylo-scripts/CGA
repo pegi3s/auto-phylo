@@ -1,0 +1,56 @@
+#!/bin/bash
+
+cga_autop_version=3.0.0
+cga_seda_docker_version=1.6.1
+cga_seda_program_version=1.6.1
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$cga_seda_docker_c_version" != "" ]; then
+	cga_autop_version="?"
+	cga_seda_docker_version=$cga_seda_docker_c_version
+	cga_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data -v /var/run/docker.sock:/var/run/docker.sock -v /tmp:/tmp pegi3s/seda:$cga_seda_docker_version /opt/SEDA/run-cli.sh")
+
+mkdir -p /data/$prefix"1a-blast_results" /data/$prefix"1b-blast_results" /data/$prefix"2-grow_sequences"  /data/$prefix"3-CGA" /data/$out_dir 
+echo "Running CGA-Blast"
+$start blast -id /data/$input_dir -od /data/$prefix"1a-blast_results" -qf /data/$cga_reference1 -qm each -qbt tblastn -ev $cga_expect1 -hit-regions-window $cga_hit_region_window1 > /dev/null 2>&1
+$start rename-header-multipart -id /data/$prefix"1a-blast_results" -od /data/$prefix"1a-blast_results"  -fd " " -f "1" > /dev/null 2>&1
+$start rename-header-add-word -id /data/$prefix"1a-blast_results" -od /data/$prefix"1a-blast_results"  -p suffix -s "Seq" -ai > /dev/null 2>&1
+if [ $cga_reference2 != "" ] ; then
+	$start blast -id /data/$prefix"1a-blast_results" -od /data/$prefix"1b-blast_results" -qf /data/$cga_reference2 -qm each -qbt tblastn -ev $cga_expect2 -hit-regions-window $cga_hit_region_window2 > /dev/null 2>&1
+	sed -i 's/_/ /g' /data/$prefix"1b-blast_results"/*
+	$start rename-header-multipart -id /data/$prefix"1b-blast_results" -od /data/$prefix"1b-blast_results"  -fd " " -f "1" > /dev/null 2>&1
+	$start rename-header-add-word -id /data/$prefix"1b-blast_results" -od /data/$prefix"1b-blast_results"  -p suffix -s "Seq" -ai > /dev/null 2>&1
+	echo "Running CGA-Growing Sequences"
+	$start grow -id /data/$prefix"1b-blast_results" -od /data/$prefix"2-grow_sequences" -mo $cga_min_overlap > /dev/null 2>&1
+else
+	echo "Running CGA-Growing Sequences"
+	$start grow -id /data/$prefix"1a-blast_results" -od /data/$prefix"2-grow_sequences" -mo $cga_min_overlap > /dev/null 2>&1
+fi
+sed -i 's/_/ /g' /data/$prefix"2-grow_sequences"/*
+$start rename-header-multipart -id /data/$prefix"2-grow_sequences" -od /data/$prefix"2-grow_sequences"  -fd " " -f "1" > /dev/null 2>&1
+$start rename-header-add-word -id /data/$prefix"2-grow_sequences" -od /data/$prefix"2-grow_sequences"  -p suffix -s "Seq" -ai > /dev/null 2>&1
+sed -i 's/\./_/g' /data/$prefix"2-grow_sequences"/*
+$start reformat -id /data/$prefix"2-grow_sequences" -od /data/$prefix"2-grow_sequences" -rlb > /dev/null 2>&1
+echo "Running CGA-CGA"
+$start cga -id /data/$prefix"2-grow_sequences" -od /data/$prefix"3-CGA" -rf /data/$cga_reference3 -md $cga_max_dist -ibp $cga_intron_bp -mfs $cga_min_full_nucleotide_size -scr $cga_selection_criterion -sco $cga_selection_correction  > /dev/null 2>&1
+$start rename-header-multipart -id /data/$prefix"3-CGA" -od /data/$out_dir  -fd "_" -f "1,2,3,4" > /dev/null 2>&1
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*CGA" "$versions_file"; then
+    echo "CGA $cga_autop_version,pegi3s/seda:$cga_seda_docker_version,SEDA $cga_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

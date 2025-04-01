@@ -1,0 +1,52 @@
+#!/bin/bash
+
+muscle_autop_version=3.0.0
+muscle_docker_version=3.8.31
+muscle_program_version=3.8.31
+muscle_seda_docker_version=1.6.1
+muscle_seda_program_version=1.6.1
+muscle_ref="Edgar RC. (2004)"
+muscle_doi="10.1093/nar/gkh340"
+seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
+seda_doi="10.1109/TCBB.2020.3040383"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$muscle_docker_c_version" != "" ]; then
+	muscle_autop_version="?"
+	muscle_docker_version=$muscle_docker_c_version
+	muscle_program_version="?"
+	muscle_ref="?"
+	muscle_doi="?"
+fi
+
+if [ "$muscle_seda_docker_c_version" != "" ]; then
+	muscle_autop_version="?"
+	muscle_seda_docker_version=$muscle_seda_docker_c_version
+	muscle_seda_program_version="?"
+	seda_ref="?"
+	seda_doi="?"
+fi
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$muscle_seda_docker_version /opt/SEDA/run-cli.sh")
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Aligning nucleotide sequences with MUSCLE"
+mkdir -p /data/$out_dir
+docker run --rm -v $dir:/data pegi3s/muscle:$muscle_docker_version -in /data/$input_dir/$file_name -out /data/$out_dir/$file_name.nuc_aligned > /dev/null 2>&1
+$start reformat -id /data/$out_dir -od /data/$out_dir -rlb
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Muscle" "$versions_file"; then
+    echo "Muscle $muscle_autop_version,pegi3s/muscle:$muscle_docker_version,Muscle $muscle_program_version,," >> "$versions_file"
+    echo ",pegi3s/seda:$muscle_seda_docker_version,SEDA $muscle_seda_program_version,\"$seda_ref\",\"$seda_doi\"" >> "$versions_file"
+fi
+
+echo -e "muscle_ref=\"$muscle_ref\"\nmuscle_doi=\"$muscle_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "seda_ref=\"$seda_ref\"\nseda_doi=\"$seda_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+

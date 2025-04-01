@@ -1,0 +1,95 @@
+#!/bin/bash
+
+mrbayes_autop_version=3.0.0
+mrbayes_docker_version=3.2.6
+mrbayes_program_version=3.2.6
+mrbayes_alter_docker_version=1.3.4
+mrbayes_alter_program_version=1.3.4
+mrbayes_bioconvert_docker_version=0.4.3
+mrbayes_bioconvert_program_version=0.4.3
+mrbayes_ref="Huelsenbeck, J. P., & Ronquist, F. (2001)"
+mrbayes_doi="10.1093/bioinformatics/17.8.754"
+alter_ref="Glez-Peña D, Gómez-Blanco D, Reboiro-Jato M, Fdez-Riverola F, Posada D. (2010)"
+alter_doi="10.1093/nar/gkq321"
+bioconvert_ref="Caro H, Dollin S, Biton A, Brancotte B, Desvillechabrol D, Dufresne Y, Li B, Kornobis E, Lemoine F, Maillet N, Perrin A, Traut N, Néron B, Cokelaer T. (2023)"
+bioconvert_doi="10.1093/nargab/lqad074"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$mrbayes_docker_c_version" != "" ]; then
+	mrbayes_autop_version="?"
+	mrbayes_docker_version=$mrbayes_docker_c_version
+	mrbayes_program_version="?"
+	mrbayes_ref="?"
+	mrbayes_doi="?"
+fi
+
+if [ "$mrbayes_alter_docker_c_version" != "" ]; then
+	mrbayes_autop_version="?"
+	mrbayes_alter_docker_version=$mrbayes_alter_docker_c_version
+	mrbayes_alter_program_version="?"
+	alter_ref="?"
+	alter_doi="?"
+fi
+
+if [ "$mrbayes_bioconvert_docker_c_version" != "" ]; then
+	mrbayes_autop_version="?"
+	mrbayes_bioconvert_docker_version=$mrbayes_bioconvert_docker_c_version
+	mrbayes_bioconvert_program_version="?"
+	bioconvert_ref="?"
+	bioconvert_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Running MrBayes"
+while read header; do
+	read sequence
+	header_mod=${header:0:98}
+	echo $header_mod >> /data/$input_dir/$file_name.truncated
+	echo $sequence >> /data/$input_dir/$file_name.truncated
+done < /data/$input_dir/$file_name
+mkdir -p /data/$prefix"1-ALTER_conversion"
+docker run --rm -v $dir:/data pegi3s/alter:$mrbayes_alter_docker_version -i /data/$input_dir/$file_name.truncated -o /data/$prefix"1-ALTER_conversion"/alter_output.nex -ia -of NEXUS -oo Linux -op GENERAL > /dev/null 2>&1
+mkdir -p /data/$prefix"2-MrBayes"
+cp /data/$prefix"1-ALTER_conversion"/alter_output.nex /data/$prefix"2-MrBayes"
+sed -i "/ABCDEFGHIKLMNOPQRSTUVWXYZ/d" /data/$prefix"2-MrBayes"/alter_output.nex
+sed -i "s/datatype\=NUCLEOTIDE/datatype\=DNA/g" /data/$prefix"2-MrBayes"/alter_output.nex
+echo "begin mrbayes;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "set autoclose=yes nowarn=yes;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+number=$(grep "nchar=" /data/$prefix"2-MrBayes"/alter_output.nex | cut -f3 -d "=" | sed s"/\;//g")
+echo "charset first_pos = 1-$number\3;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "charset second_pos = 2-$number\3;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "charset third_pos = 3-$number\3;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "partition by_codon = 3: first_pos,second_pos,third_pos;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "set partition = by_codon;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "lset nst=6 rates=invgamma;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "unlink shape=(3);" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "mcmc ngen=$mb_ngen;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "sump burnin=$mb_burnin;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "sumt conformat=simple burnin=$mb_burnin;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "end;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+docker run --rm -v $dir/$prefix"2-MrBayes":/data pegi3s/mrbayes:$mrbayes_docker_version mb /data/alter_output.nex > /data/$prefix"2-MrBayes"/log
+mkdir -p /data/$prefix"3-MrBayes_tree"
+sed -e "/   \[Note\: This tree contains information only on the topology/,/end/c\end;" /data/$prefix"2-MrBayes"/*.con.tre > /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre
+echo "Converting nexus to newick"
+docker run --rm -v $dir:/data pegi3s/bioconvert:$mrbayes_bioconvert_docker_version nexus2newick /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre.nwk
+mkdir -p /data/$out_dir
+cp /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre.nwk /data/$out_dir/$file_name.con.tre.nwk
+rm /data/$input_dir/$file_name.truncated
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*MrBayes" "$versions_file"; then
+    echo "MrBayes $mrbayes_autop_version,pegi3s/mrbayes:$mrbayes_docker_version,MrBayes $mrbayes_program_version,\"$mrbayes_ref\",\"$mrbayes_doi\"" >> "$versions_file"
+    echo ",pegi3s/alter:$mrbayes_alter_docker_version,Alter $mrbayes_alter_program_version,\"$alter_ref\",\"$alter_doi\"" >> "$versions_file"
+    echo ",pegi3s/bioconvert:$mrbayes_bioconvert_docker_version,Bioconvert $mrbayes_bioconvert_program_version,\"$bioconvert_ref\",\"$bioconvert_doi\"" >> "$versions_file"
+fi
+
+echo -e "mrbayes_ref=\"$mrbayes_ref\"\nmrbayes_doi=\"$mrbayes_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "alter_ref=\"$alter_ref\"\nalter_doi=\"$alter_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "bioconvert_ref=\"$bioconvert_ref\"\nbioconvert_doi=\"$bioconvert_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
