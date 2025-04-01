@@ -1,0 +1,50 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Reformatting the sequence headers"
+mkdir -p /data/$prefix"1-Reformatted_headers"
+$start rename-header-multipart -id /data/$input_dir -od /data/$prefix"1-Reformatted_headers" -ht "all" -fd " " -fm keep -f 1 > /dev/null 2>&1
+$start rename-header-replace-word -id /data/$prefix"1-Reformatted_headers" -od /data/$prefix"1-Reformatted_headers" -ht "all" -tw "_[0-9]+$" -r -rp "" > /dev/null 2>&1
+$start rename-header-replace-word -id /data/$prefix"1-Reformatted_headers" -od /data/$prefix"1-Reformatted_headers" -ht "all" -tw "lcl\|" -r -rp "" > /dev/null 2>&1
+$start rename-header-replace-word -id /data/$prefix"1-Reformatted_headers" -od /data/$prefix"1-Reformatted_headers" -ht "all" -tw "_cds_" -r -rp "_" > /dev/null 2>&1
+$start rename-header-replace-word -id /data/$prefix"1-Reformatted_headers" -od /data/$prefix"1-Reformatted_headers" -ht "all" -tw "\." -r -rp "_" > /dev/null 2>&1
+$start rename-header-replace-word -id /data/$prefix"1-Reformatted_headers" -od /data/$prefix"1-Reformatted_headers" -ht "all" -tw "__" -r -rp "_" > /dev/null 2>&1
+echo "Removing sequences with ambiguous nucleotides"
+mkdir -p /data/$prefix"2-Remove_ambiguous_nucleotides"
+$start pattern-filtering -id /data/$prefix"1-Reformatted_headers" -od /data/$prefix"2-Remove_ambiguous_nucleotides" -wop [NVHDBMKWSYR] > /dev/null 2>&1
+echo "Keep sequences with start codons, without in frame stop codons, and that are multiple of 3"
+mkdir -p /data/$prefix"3-Start_and_multiple_of_3"
+start_codon_1=$(echo $start_codon | sed "s/ / \-sc /g")	
+$start filtering -id /data/$prefix"2-Remove_ambiguous_nucleotides" -od /data/$prefix"3-Start_and_multiple_of_3" -sc $cgf_cga_start_codon -rnm3 -rwifsc > /dev/null 2>&1
+echo "Removing stop codons"
+mkdir -p /data/$prefix"4-Remove_stop_codons"
+$start remove-stop-codons -id /data/$prefix"3-Start_and_multiple_of_3" -od /data/$prefix"4-Remove_stop_codons" -rlb -lb unix > /dev/null
+echo "Removing sequences by size difference"
+mkdir -p /data/$prefix"5-Size_difference"	
+$start filtering -id /data/$prefix"4-Remove_stop_codons" -od /data/$prefix"5-Size_difference" -rsd -maxsd $cgf_cga_max_size_difference -rsf /data/$cgf_cga_reference_file > /dev/null 2>&1
+echo "Searching for the typical amino acid pattern"
+mkdir -p /data/$prefix"6-Search_pattern"
+$start pattern-filtering -id /data/$prefix"5-Size_difference" -od /data/$prefix"6-Search_pattern" -wp $cgf_cga_pattern -caa -f 1 -ct $cgf_cga_codon_table > /dev/null 2>&1
+echo "Removing Isoforms"
+mkdir -p /data/$prefix"7-Remove_isoforms" /data/$prefix"8-Removed_isoforms"
+$start remove-isoforms -id /data/$prefix"6-Search_pattern" -od /data/$prefix"7-Remove_isoforms/" -mwl $cgf_cga_isoform_min_word_length --reference-size $cgf_cga_isoform_ref_size -tbm longest -ifd /data/$prefix"8-Removed_isoforms" > /dev/null 2>&1
+mkdir -p /data/$out_dir
+cp /data/$prefix"7-Remove_isoforms"/* /data/$out_dir
+
+ 
+
+
+
+
+
+
+
+
+

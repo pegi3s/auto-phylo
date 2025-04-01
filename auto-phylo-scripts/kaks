@@ -1,0 +1,19 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data -v /var/run/docker.sock:/var/run/docker.sock -v /tmp:/tmp pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "KaKs Calculator"
+mkdir -p /data/$out_dir /data/$prefix"1-KaKs"
+file_name=$(cd /data/$input_dir && ls *)
+$start reformat -id /data/$input_dir -od /data/$input_dir -rlb > /dev/null 2>&1
+docker run --rm -v $dir/$input_dir:/data pegi3s/kakscalculator bash -c "FASTA-AXT /data/$file_name && KaKs_Calculator -i /data/$file_name.axt -o /data/$file_name.axt.kaks -m $kaks_model -c $kaks_genetic_code" > /dev/null 2>&1
+cp /data/$input_dir/*.axt /data/$prefix"1-KaKs"
+cp /data/$input_dir/*.kaks /data/$out_dir
+rm /data/$input_dir/{*.axt,*.kaks}	
+

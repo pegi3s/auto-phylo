@@ -1,0 +1,15 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+echo "Disambiguating files"
+mkdir -p /data/$prefix"1-Disambiguate" /data/$out_dir
+$start disambiguate -id /data/$input_dir -od /data/$prefix"1-Disambiguate" -m rename
+cp /data/$prefix"1-Disambiguate"/* /data/$out_dir
+

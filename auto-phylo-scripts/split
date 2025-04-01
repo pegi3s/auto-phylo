@@ -1,0 +1,16 @@
+#!/bin/bash
+
+input_dir=$1
+dir_number=$2
+
+cd /data/$input_dir
+i=0
+for f in *
+do
+  if [ $((i+=1)) -gt "$dir_number" ]; then
+    i=1
+  fi
+  mkdir -p /data/$input_dir.$i
+  cp /data/$input_dir/"$f" "/data/$input_dir.$i" 
+done
+cd /data

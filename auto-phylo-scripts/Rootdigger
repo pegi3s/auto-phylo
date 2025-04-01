@@ -1,0 +1,13 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+echo "Rooting tree"
+mkdir /data/$out_dir
+docker run --rm -v $dir:/data pegi3s/rootdigger bash -c "cd /usr/local/bin && ./rd --msa /data/$input_dir/*.nuc_aligned --tree /data/$input_dir/*.nwk" --$rootdigger_mode > /dev/null 2>&1
+rm /data/$input_dir/*.ckp
+name=$(cd /data/$input_dir && ls *.nwk.rooted.tree | sed 's/nuc_aligned.nwk\.//g')
+mv  /data/$input_dir/*.nwk.rooted.tree /data/$out_dir/$name.nwk

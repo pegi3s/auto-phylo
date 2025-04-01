@@ -1,0 +1,32 @@
+#!/bin/bash
+
+. /data/config
+
+i=0
+old_output=""
+while read command input output split dir_number; do
+	if [ "$old_output" != "$input" ]; then
+		i=$((i+1))
+		j=1
+	elif [ "$old_output" = "" ]; then
+		i=1
+		j=1
+	else
+		j=$((j+1))
+	fi
+	prefix=$(echo "B"$i"C"$j"/B"$i"C"$j"-")
+	echo $command $input $output $split $dir_number "B"$i"C"$j >> /data/blocks_and_commands
+	if [ "$split" = "split" ] && [ "$command" != "add_taxonomy" ] && [ "$command" != "check_contamination" ] && [ "$command" != "Clustal_Omega" ] && [ "$command" != "Clustal_Omega_codons" ] && [ "$command" != "Fasttree" ] && [ "$command" != "merge" ] && [ "$command" != "MrBayes" ] && [ "$command" != "tblastx" ] && [ "$command" != "T-coffee" ] && [ "$command" != "T-coffee_codons" ] && [ "$command" != "JModel_test" ] && [ "$command" != "me_tree" ] && [ "$command" != "ml_tree" ] && [ "$command" != "mp_tree" ] && [ "$command" != "nj_tree" ] && [ "$command" != "tree_collapse" ] && [ "$command" != "upgma_tree" ] && [ "$command" != "tblastn" ] && [ "$command" != "blastn" ] && [ "$command" != "add_refs" ] && [ "$command" != "get_phylo_taxa" ] && [ "$command" != "Fastroot" ] && [ "$command" != "Mafft" ] && [ "$command" != "Mafft_codons" ] && [ "$command" != "Probcons" ] && [ "$command" != "Probcons_codons" ] && [ "$command" != "Probcons_refinement" ] && [ "$command" != "Rootdigger" ] && [ "$command" != "ipssa" ] && [ "$command" != "kaks" ] ; then
+		/opt/split $input $dir_number
+		for n in $( eval echo {1..$dir_number} );  do
+			a=$(echo $command $input.$n $output $prefix"R"$n"-")
+			/opt/$a
+			rm -rf /data/$input.$n
+		done
+	split=""
+	else
+		a=$(echo ./$command $input $output $prefix)
+		/opt/$a	
+	fi
+	old_output=$output
+done < /data/pipeline

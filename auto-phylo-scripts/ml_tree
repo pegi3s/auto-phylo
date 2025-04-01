@@ -1,0 +1,15 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+file_name=$(cd /data/$input_dir && ls *)
+mkdir -p /data/$prefix"1-Maximum_Likelihood_MEGA_tree_construction"/mega_ml_out  /data/$out_dir
+echo "Building a Maximum Likelihood tree using MEGA"
+cd /opt
+sed "s/\#bootstrap\#/$ml_tree_bootstrap/g; s/\#treatment\#/$ml_tree_treatment/g" ml_tree.mao > /data/$prefix"1-Maximum_Likelihood_MEGA_tree_construction"/ml.mao
+cp /data/$input_dir/$file_name /data/$prefix"1-Maximum_Likelihood_MEGA_tree_construction"/$file_name.fas
+docker run --rm -v $dir:/data pegi3s/megax_cc megacc -a /data/$prefix"1-Maximum_Likelihood_MEGA_tree_construction"/ml.mao -d /data/$prefix"1-Maximum_Likelihood_MEGA_tree_construction"/$file_name.fas -o /data/$prefix"1-Maximum_Likelihood_MEGA_tree_construction"/mega_ml_out > /dev/null 2>&1
+cp /data/$prefix"1-Maximum_Likelihood_MEGA_tree_construction"/mega_ml_out/$file_name"-1.nwk" /data/$out_dir/$file_name.nwk

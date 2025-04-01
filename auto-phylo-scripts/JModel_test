@@ -1,0 +1,17 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+start=$(echo "docker run --rm  -v $dir:/data pegi3s/$SEDA /opt/SEDA/run-cli.sh")
+
+file_name=$(cd /data/$input_dir && ls *)
+
+
+echo "Running J-model test"
+mkdir -p /data/$prefix"1-Header_rename" /data/$prefix"2-J-model_test" /data/$out_dir
+$start rename-header-replace-word -id /data/$input_dir -od /data/$prefix"1-Header_rename" -ht "all" -tw "[^0-9,a-z,A-Z]" -r -rp "_" > /dev/null 2>&1
+docker run --rm -v $dir:/data pegi3s/jmodeltest2 java -jar /jmodeltest2/dist/jModelTest.jar -d /data/$prefix"1-Header_rename"/$file_name -g 4 -i -f -AIC -BIC -a -o /data/$prefix"2-J-model_test"/$file_name.AIC
+cp /data/$prefix"2-J-model_test"/* /data/$out_dir

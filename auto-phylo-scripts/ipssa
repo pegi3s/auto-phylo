@@ -1,0 +1,86 @@
+#!/bin/bash
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+echo "Running IPSSA"
+mkdir -p /data/$prefix"1-ipssa"/ipssa_project/input /data/$out_dir
+cp /data/$input_dir/* /data/$prefix"1-ipssa"/ipssa_project/input/
+
+echo "#" > /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "### General parameters ###" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo ""  >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The maximum number of sequences to use for the master file" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "sequence_limit=$ipssa_sequence_limit"  >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The random seed" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "random_seed=$ipssa_random_seed" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "### Alignment ###" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The alignment method: clustalw, muscle, kalign, t_coffee, or amap" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "align_method=$ipssa_align_method" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# Minimum support value for amino acid positions in the alignment" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "tcoffee_min_score=$ipssa_tcoffee_min_score" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "### MrBayes ###" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# Number of iterations in MrBayes" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "mrbayes_generations=$ipssa_mrbayes_generations" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# MrBayes burnin" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "mrbayes_burnin=$ipssa_mrbayes_burnin" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "### FUBAR ###" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The maximum number of sequences to be used by FUBAR." >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "fubar_sequence_limit=$ipssa_fubar_sequence_limit" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The number of FUBAR runs" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "fubar_runs=$ipssa_fubar_runs" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "### codeML ###" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The maximum number of sequences to be used by CodeML" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "codeml_sequence_limit=$ipssa_codeml_sequence_limit" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The number of CodeML runs" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "codeml_runs=$ipssa_codeml_runs" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The CodeML models to be run, one or more of: 1, 2, 7, and/or 8." >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "codeml_models=$ipssa_codeml_models" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "### OmegaMap ###" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "#" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The maximum number of sequences to use in OmegaMap" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "omegamap_sequence_limit=$ipssa_omegamap_sequence_limit" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The number of OmegaMap runs" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "omegamap_runs=$ipssa_omegamap_runs" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "# The number of OmegaMap iterations" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+echo "omegamap_iterations=$ipssa_omegamap_iterations" >> /data/$prefix"1-ipssa"/ipssa_project/ipssa-project.params
+# Edit the PROJECT_DIR variable
+PROJECT_DIR=$dir/$prefix"1-ipssa"/ipssa_project
+# Adjust the COMPI_NUM_TASKS to an appropiate value
+COMPI_NUM_TASKS=6
+PIPELINE_WORKING_DIR=${PROJECT_DIR}/pipeline_working_dir
+INPUT_DIR=${PROJECT_DIR}/input
+PARAMS_DIR=${PROJECT_DIR}
+docker run -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -v ${PIPELINE_WORKING_DIR}:/working_dir -v ${INPUT_DIR}:/input -v ${PARAMS_DIR}:/params --rm pegi3s/ipssa -o --logs /working_dir/logs --num-tasks ${COMPI_NUM_TASKS} -pa /params/ipssa-project.params -- --host_working_dir ${PIPELINE_WORKING_DIR}
+cp /data/$prefix"1-ipssa"/ipssa_project/pipeline_working_dir/results/tabulated/* /data/$out_dir

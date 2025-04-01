@@ -1,0 +1,43 @@
+#!/bin/bash
+
+. /data/config
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+echo "Running MrBayes"
+file_name=$(cd /data/$input_dir && ls *)
+while read header; do
+	read sequence
+	header_mod=${header:0:98}
+	echo $header_mod >> /data/$input_dir/$file_name.truncated
+	echo $sequence >> /data/$input_dir/$file_name.truncated
+done < /data/$input_dir/$file_name
+mkdir -p /data/$prefix"1-ALTER_conversion"
+docker run --rm -v $dir:/data pegi3s/alter -i /data/$input_dir/$file_name.truncated -o /data/$prefix"1-ALTER_conversion"/alter_output.nex -ia -of NEXUS -oo Linux -op GENERAL > /dev/null 2>&1
+mkdir -p /data/$prefix"2-MrBayes"
+cp /data/$prefix"1-ALTER_conversion"/alter_output.nex /data/$prefix"2-MrBayes"
+sed -i "/ABCDEFGHIKLMNOPQRSTUVWXYZ/d" /data/$prefix"2-MrBayes"/alter_output.nex
+sed -i "s/datatype\=NUCLEOTIDE/datatype\=DNA/g" /data/$prefix"2-MrBayes"/alter_output.nex
+echo "begin mrbayes;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "set autoclose=yes nowarn=yes;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+number=$(grep "nchar=" /data/$prefix"2-MrBayes"/alter_output.nex | cut -f3 -d "=" | sed s"/\;//g")
+echo "charset first_pos = 1-$number\3;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "charset second_pos = 2-$number\3;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "charset third_pos = 3-$number\3;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "partition by_codon = 3: first_pos,second_pos,third_pos;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "set partition = by_codon;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "lset nst=6 rates=invgamma;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "unlink shape=(3);" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "mcmc ngen=$mb_ngen;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "sump burnin=$mb_burnin;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "sumt conformat=simple burnin=$mb_burnin;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+echo "end;" >> /data/$prefix"2-MrBayes"/alter_output.nex
+docker run --rm -v $dir/$prefix"2-MrBayes":/data pegi3s/mrbayes mb /data/alter_output.nex 2>&1 | tee /data/$prefix"2-MrBayes"/log
+mkdir -p /data/$prefix"3-MrBayes_tree"
+sed -e "/   \[Note\: This tree contains information only on the topology/,/end/c\end;" /data/$prefix"2-MrBayes"/*.con.tre > /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre
+echo "Converting nexus to newick"
+docker run --rm -v $dir:/data pegi3s/bioconvert:0.4.3 nexus2newick /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre.nwk
+mkdir -p /data/$out_dir
+cp /data/$prefix"3-MrBayes_tree"/MrBayes.con.tre.nwk /data/$out_dir/$file_name.con.tre.nwk
+rm /data/$input_dir/$file_name.truncated
