@@ -1,8 +1,8 @@
 #!/bin/bash
 
-prefix_autop_version=3.0.0
-prefix_seda_docker_version=1.6.1
-prefix_seda_program_version=1.6.1
+prefix_autop_version=3.0.1
+prefix_seda_docker_version=1.7.5-docker29.0.1
+prefix_seda_program_version=1.7.5
 seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
 seda_doi="10.1109/TCBB.2020.3040383"
 

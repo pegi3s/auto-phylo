@@ -1,6 +1,6 @@
 #!/bin/bash
 
-merge_autop_version=3.0.0
+main_autop_version=3.0.0
 
 . /data/config
 

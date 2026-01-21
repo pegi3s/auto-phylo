@@ -1,10 +1,10 @@
 #!/bin/bash
 
-get_phylo_taxa_autop_version=3.0.0
-get_phylo_taxa_seda_docker_version=1.6.1
-get_phylo_taxa_seda_program_version=1.6.1
+get_phylo_taxa_autop_version=3.0.1
+get_phylo_taxa_seda_docker_version=1.7.5-docker29.0.1
+get_phylo_taxa_seda_program_version=1.7.5
 get_phylo_taxa_utilities_docker_version=0.22.2
-get_phylo_taxa_utilities_program_version=0.22.0
+get_phylo_taxa_utilities_program_version=0.22.2
 seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
 seda_doi="10.1109/TCBB.2020.3040383"
 

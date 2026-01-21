@@ -1,7 +1,7 @@
 #!/bin/bash
 
-ncbi_retrieve_autop_version=3.0.0
-ncbi_retrieve_docker_version=1.0.1
+ncbi_retrieve_autop_version=3.0.1
+ncbi_retrieve_docker_version=1.0.1-docker29.0.1
 ncbi_retrieve_program_version=1.0.1
 
 . /data/config

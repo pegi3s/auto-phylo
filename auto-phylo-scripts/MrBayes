@@ -1,8 +1,8 @@
 #!/bin/bash
 
-mrbayes_autop_version=3.0.0
-mrbayes_docker_version=3.2.6
-mrbayes_program_version=3.2.6
+mrbayes_autop_version=3.0.1
+mrbayes_docker_version=3.2.7
+mrbayes_program_version=3.2.7
 mrbayes_alter_docker_version=1.3.4
 mrbayes_alter_program_version=1.3.4
 mrbayes_bioconvert_docker_version=0.4.3

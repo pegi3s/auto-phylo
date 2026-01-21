@@ -1,14 +1,14 @@
 #!/bin/bash
 
-probcons_codons_autop_version=3.0.0
+probcons_codons_autop_version=3.0.1
 probcons_codons_docker_version=1.12
 probcons_codons_program_version=1.12
 probcons_codons_emboss_docker_version=6.6.0
 probcons_codons_emboss_program_version=6.6.0
 probcons_codons_translatorx_docker_version=01.09.2022
 probcons_codons_translatorx_program_version="https://translatorx.org"
-probcons_codons_seda_docker_version=1.6.1
-probcons_codons_seda_program_version=1.6.1
+probcons_codons_seda_docker_version=1.7.5-docker29.0.1
+probcons_codons_seda_program_version=1.7.5
 probcons_ref="Do CB, Mahabhashyam MS, Brudno M, Batzoglou S. (2005)"
 probcons_doi="10.1101/gr.2821705"
 emboss_ref="Rice, P., Longden, I., & Bleasby, A. (2000)"

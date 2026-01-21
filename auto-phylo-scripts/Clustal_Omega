@@ -1,10 +1,10 @@
 #!/bin/bash
 
-clustalomega_autop_version=3.0.0
+clustalomega_autop_version=3.0.1
 clustalomega_docker_version=1.2.4
 clustalomega_program_version=1.2.4
-clustalomega_seda_docker_version=1.6.1
-clustalomega_seda_program_version=1.6.1
+clustalomega_seda_docker_version=1.7.5-docker29.0.1
+clustalomega_seda_program_version=1.7.5
 clustalomega_ref="Sievers, F., & Higgins, D. G. (2014)"
 clustalomega_doi="10.1002/0471250953.bi0313s48"
 seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"

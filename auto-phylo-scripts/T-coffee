@@ -1,8 +1,8 @@
 #!/bin/bash
 
-tcoffee_autop_version=3.0.0
-tcoffee_docker_version=12.00.7
-tcoffee_program_version=12.00.7
+tcoffee_autop_version=3.0.1
+tcoffee_docker_version=12.0.7
+tcoffee_program_version=12.0.7
 tcoffee_ref="Notredame, C., Higgins, D. G., & Heringa, J. (2000)"
 tcoffee_doi="10.1006/jmbi.2000.4042"
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-tcoffee_codons_autop_version=3.0.0
-tcoffee_codons_docker_version=12.00.7
-tcoffee_codons_program_version=12.00.7
+tcoffee_codons_autop_version=3.0.1
+tcoffee_codons_docker_version=12.0.7
+tcoffee_codons_program_version=12.0.7
 tcoffee_codons_emboss_docker_version=6.6.0
 tcoffee_codons_emboss_program_version=6.6.0
 tcoffee_codons_translatorx_docker_version=01.09.2022

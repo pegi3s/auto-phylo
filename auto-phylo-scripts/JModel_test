@@ -1,10 +1,10 @@
 #!/bin/bash
 
-jmodeltest_autop_version=3.0.0
+jmodeltest_autop_version=3.0.1
 jmodeltest_docker_version=2.1.10
 jmodeltest_program_version=2.1.10
-jmodeltest_seda_docker_version=1.6.1
-jmodeltest_seda_program_version=1.6.1
+jmodeltest_seda_docker_version=1.7.5-docker29.0.1
+jmodeltest_seda_program_version=1.7.5
 jmodeltest_ref="Darriba, D., Taboada, G. L., Doallo, R., & Posada, D. (2012)"
 jmodeltest_doi="10.1038/nmeth.2109"
 seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"

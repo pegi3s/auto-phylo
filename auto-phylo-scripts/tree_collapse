@@ -1,10 +1,10 @@
 #!/bin/bash
 
-tree_collapse_autop_version=3.0.0
-tree_collapse_docker_version=1.1.0
-tree_collapse_program_version=1.1.0
-tree_collapse_seda_docker_version=1.6.1
-tree_collapse_seda_program_version=1.6.1
+tree_collapse_autop_version=3.0.1
+tree_collapse_docker_version=1.3.0
+tree_collapse_program_version=1.3.0
+tree_collapse_seda_docker_version=1.7.5-docker29.0.1
+tree_collapse_seda_program_version=1.7.5
 seda_ref="Lopez-Fernandez, H., Duque, P., Vazquez, N., Fdez-Riverola, F., Reboiro-Jato, M., Vieira, C. P., & Vieira, J. (2022)"
 seda_doi="10.1109/TCBB.2020.3040383"
 
@@ -34,12 +34,13 @@ file_name=$(cd /data/$input_dir && ls *)
 start=$(echo "docker run --rm  -v $dir:/data pegi3s/seda:$tree_collapse_seda_docker_version /opt/SEDA/run-cli.sh")
 
 if [ "$tc_taxonomy" = "" ]; then
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $dir:/data pegi3s/phylogenetic-tree-collapser:$tree_collapse_docker_version collapse-tree.py --input /data/$input_dir/*.nwk --input-format newick --output /data/$prefix"1-Collapsed_tree"/$file_name.tree_collapsed --output-type phylogram --output-collapsed-nodes /data/$prefix"1-Collapsed_tree"/$file_name.collapsed_nodes --input-path-host $dir > /dev/null 2>&1
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $dir:/data pegi3s/phylogenetic-tree-collapser:$tree_collapse_docker_version collapse-tree.py --input /data/$input_dir/*.nwk --input-format newick --output /data/$prefix"1-Collapsed_tree"/$file_name.tree_collapsed --output-type phylogram --output-collapsed-nodes /data/$prefix"1-Collapsed_tree"/$file_name.collapsed_nodes > /dev/null 2>&1
 	mv /data/$input_dir/$file_name.sequence_to_species_mapping /data/$prefix"1-Collapsed_tree"
 	mv /data/$input_dir/$file_name.taxonomy /data/$prefix"1-Collapsed_tree"
 else
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $dir:/data pegi3s/phylogenetic-tree-collapser:$tree_collapse_docker_version collapse-tree.py --input /data/$input_dir/*.nwk --input-format newick --taxonomy /data/"$tc_taxonomy" --sequence-mapping /data/"$tc_stsm" --output /data/$prefix"1-Collapsed_tree"/$file_name.tree_collapsed --output-type phylogram --output-collapsed-nodes /data/$prefix"1-Collapsed_tree"/$file_name.collapsed_nodes --input-path-host $dir
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $dir:/data pegi3s/phylogenetic-tree-collapser:$tree_collapse_docker_version collapse-tree.py --input /data/$input_dir/*.nwk --input-format newick --taxonomy /data/"$tc_taxonomy" --sequence-mapping /data/"$tc_stsm" --output /data/$prefix"1-Collapsed_tree"/$file_name.tree_collapsed --output-type phylogram --output-collapsed-nodes /data/$prefix"1-Collapsed_tree"/$file_name.collapsed_nodes > /dev/null 2>&1
 fi
+echo "estou aqui"  $out_dir
 cp /data/$prefix"1-Collapsed_tree"/*.tree_collapsed /data/$out_dir
 cp /data/$prefix"1-Collapsed_tree"/*.collapsed_nodes /data/$out_dir	
 cp /data/$input_dir/*.nwk /data/$out_dir

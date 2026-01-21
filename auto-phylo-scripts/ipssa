@@ -1,8 +1,8 @@
 #!/bin/bash
 
-ipssa_autop_version=3.0.0
-ipssa_docker_version=1.2.4
-ipssa_program_version=1.2.4
+ipssa_autop_version=3.0.1
+ipssa_docker_version=1.2.6
+ipssa_program_version=1.2.6
 ipssa_ref="López-Fernández, H., Vieira, C.P., Ferreira, P. et al. (2021)"
 ipssa_doi="10.1007/s12539-021-00439-2"
 

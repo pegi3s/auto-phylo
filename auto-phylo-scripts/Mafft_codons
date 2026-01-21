@@ -1,14 +1,14 @@
 #!/bin/bash
 
-mafft_codons_autop_version=3.0.0
+mafft_codons_autop_version=3.0.1
 mafft_codons_docker_version=7.505
 mafft_codons_program_version=7.505
 mafft_codons_emboss_docker_version=6.6.0
 mafft_codons_emboss_program_version=6.6.0
 mafft_codons_translatorx_docker_version=01.09.2022
 mafft_codons_translatorx_program_version="https://translatorx.org"
-mafft_codons_seda_docker_version=1.6.1
-mafft_codons_seda_program_version=1.6.1
+mafft_codons_seda_docker_version=1.7.5-docker29.0.1
+mafft_codons_seda_program_version=1.7.5
 mafft_ref="Katoh K, Misawa K, Kuma K, Miyata T. (2002)"
 mafft_doi="10.1093/nar/gkf436"
 emboss_ref="Rice, P., Longden, I., & Bleasby, A. (2000)"
