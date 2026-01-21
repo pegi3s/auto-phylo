@@ -2,6 +2,9 @@
 
 This image facilitates the usage of **auto-phylo**, a pipeline maker for phylogenetic studies.
 
+> [!WARNING]
+> This image runs Docker in Docker. Users that are already running Docker 29 should start using the image with the version `3.2.2`, while users that did not yet update their Docker version to Docker 29 should use the image with the `3.2.1` tag. Starting with version `3.2.2`, from now on, only images that are compatible with Docker 29 or above will be released. You can check your Docker version by running the command: docker --version".
+
 # Versions
 
 ## v3 - July 2024
