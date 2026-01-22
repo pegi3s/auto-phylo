@@ -11,7 +11,7 @@ This image facilitates the usage of **auto-phylo**, a pipeline maker for phyloge
 
 An online manual is available [here](http://evolution6.i3s.up.pt/static/auto-phylo/v3/docs/).
 
-The latest version is `v3.2.1` (April 2025).
+The latest version is `v3.2.2` (January 2026).
 
 ## v2 - October 2023
 
