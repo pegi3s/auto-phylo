@@ -1,0 +1,36 @@
+#!/bin/bash
+
+Rootdigger_autop_version=3.0.0
+Rootdigger_docker_version=1.7.0
+Rootdigger_program_version=1.7.0
+rootdigger_ref="Bettisworth, B., & Stamatakis, A. (2021)"
+rootdigger_doi="10.1186/s12859-021-03956-5"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$Rootdigger_docker_c_version" != "" ]; then
+	Rootdigger_autop_version="?"
+	Rootdigger_docker_version=$Rootdigger_docker_c_version
+	Rootdigger_program_version="?"
+	rootdigger_ref="?"
+	rootdigger_doi="?"
+fi
+
+echo "Rooting tree"
+mkdir /data/$out_dir
+docker run --rm -v $dir:/data pegi3s/rootdigger:$Rootdigger_docker_version bash -c "cd /usr/local/bin && ./rd --msa /data/$input_dir/*.nuc_aligned --tree /data/$input_dir/*.nwk" --$rootdigger_mode > /dev/null 2>&1
+rm /data/$input_dir/*.ckp
+name=$(cd /data/$input_dir && ls *.nwk.rooted.tree | sed 's/nuc_aligned.nwk\.//g')
+mv  /data/$input_dir/*.nwk.rooted.tree /data/$out_dir/$name.nwk
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*Rootdigger" "$versions_file"; then
+    echo "Rootdigger $Rootdigger_autop_version,pegi3s/rootdigger:$Rootdigger_docker_version,Rootdigger $Rootdigger_program_version,\"$rootdigger_ref\",\"$rootdigger_doi\"" >> "$versions_file"
+fi
+
+echo -e "rootdigger_ref=\"$rootdigger_ref\"\nrootdigger_doi=\"$rootdigger_doi\"" >> /data/$project/intermediate_files/refs/tmp_references

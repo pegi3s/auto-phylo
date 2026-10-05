@@ -1,0 +1,24 @@
+#!/bin/bash
+
+split_autop_version=3.0.0
+
+input_dir=$1
+dir_number=$2
+
+cd /data/$input_dir
+i=0
+for f in *
+do
+  if [ $((i+=1)) -gt "$dir_number" ]; then
+    i=1
+  fi
+  mkdir -p /data/$input_dir.$i
+  cp /data/$input_dir/"$f" "/data/$input_dir.$i" 
+done
+cd /data
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*split" "$versions_file"; then
+    echo "split $split_autop_version,,," >> "$versions_file"
+fi

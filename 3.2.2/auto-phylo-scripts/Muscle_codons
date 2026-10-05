@@ -1,0 +1,78 @@
+#!/bin/bash
+
+muscle_codons_autop_version=3.0.0
+muscle_codons_docker_version=3.8.31
+muscle_codons_program_version=3.8.31
+muscle_codons_emboss_docker_version=6.6.0
+muscle_codons_emboss_program_version=6.6.0
+muscle_codons_translatorx_docker_version=01.09.2022
+muscle_codons_translatorx_program_version="https://translatorx.org"
+muscle_ref="Edgar RC. (2004)"
+muscle_doi="10.1093/nar/gkh340"
+emboss_ref="Rice, P., Longden, I., & Bleasby, A. (2000)"
+emboss_doi="10.1016/s0168-9525(00)02024-2"
+translatorx_ref="Abascal, F., Zardoya, R., & Telford, M. J. (2010)"
+translatorx_doi="10.1093/nar/gkq291"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$muscle_codons_docker_c_version" != "" ]; then
+	muscle_codons_autop_version="?"
+	muscle_codons_docker_version=$muscle_codons_docker_c_version
+	muscle_codons_program_version="?"
+	muscle_ref="?"
+	muscle_doi="?"
+fi
+
+if [ "$muscle_codons_emboss_docker_c_version" != "" ]; then
+	muscle_codons_autop_version="?"
+	muscle_codons_emboss_docker_version=$muscle_codons_emboss_docker_c_version
+	muscle_codons_emboss_program_version="?"
+	emboss_ref="?"
+	emboss_doi="?"
+fi
+
+if [ "$muscle_codons_translatorx_docker_c_version" != "" ]; then
+	muscle_codons_autop_version="?"
+	muscle_codons_translatorx_docker_version=$muscle_codons_translatorx_docker_c_version
+	muscle_codons_translatorx_program_version="?"
+	translatorx_ref="?"
+	translatorx_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+mkdir -p /data/$prefix"1-MUSCLE_Translated_sequences"
+docker run --rm -v $dir:/data pegi3s/emboss:$muscle_codons_emboss_docker_version transeq -sequence /data/$input_dir/$file_name -outseq /data/$prefix"1-MUSCLE_Translated_sequences"/$file_name.pep
+cd /data/$prefix"1-MUSCLE_Translated_sequences"
+sed -i 's/_1$//g' /data/$prefix"1-MUSCLE_Translated_sequences"/$file_name.pep
+cd /data
+
+echo "Aligning amino acid sequences with MUSCLE"
+mkdir -p /data/$prefix"2-MUSCLE_AA_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/muscle:$muscle_codons_docker_version -in /data/$prefix"1-MUSCLE_Translated_sequences"/$file_name.pep -out /data/$prefix"2-MUSCLE_AA_sequence_alignment"/$file_name.pep_aligned > /dev/null 2>&1
+
+echo "Creating a nucleotide alignment using the amino acid alignment as a guide"
+mkdir -p /data/$prefix"3-MUSCLE_Nuc_sequence_alignment"
+docker run --rm -v $dir:/data pegi3s/translatorx:$muscle_codons_translatorx_docker_version translatorx_vLocal.pl -i /data/$input_dir/$file_name -a /data/$prefix"2-MUSCLE_AA_sequence_alignment"/$file_name.pep_aligned -o /data/$prefix"3-MUSCLE_Nuc_sequence_alignment"/$file_name.nuc_aligned > /dev/null 2>&1
+cd /data/$prefix"3-MUSCLE_Nuc_sequence_alignment"
+mv $file_name.nuc_aligned.nt_ali.fasta $file_name.nuc_aligned
+rm $file_name*ali.fasta
+cd /data
+mkdir -p  /data/$out_dir
+cp /data/$prefix"3-MUSCLE_Nuc_sequence_alignment"/*.nuc_aligned /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+if ! grep -qE "^\s*Muscle_codons" "$versions_file"; then
+    echo "Muscle_codons $muscle_codons_autop_version,pegi3s/muscle:$muscle_codons_docker_version,Muscle $muscle_codons_program_version,\"$muscle_ref\",\"$muscle_doi\"" >> "$versions_file"
+    echo ",pegi3s/emboss:$muscle_codons_emboss_docker_version,EMBOSS $muscle_codons_emboss_program_version,\"$emboss_ref\",\"$emboss_doi\"" >> /"$versions_file"
+    echo ",pegi3s/translatorx ($muscle_codons_translatorx_docker_version),Translator X ($muscle_codons_translatorx_program_version),\"$translatorx_ref\",\"$translatorx_doi\"" >> "$versions_file"
+fi
+
+echo -e "muscle_ref=\"$muscle_ref\"\nmuscle_doi=\"$muscle_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "emboss_ref=\"$emboss_ref\"\nemboss_doi=\"$emboss_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+echo -e "translatorx_ref=\"$translatorx_ref\"\ntranslatorx_ref=\"$translatorx_ref\"" >> /data/$project/intermediate_files/refs/tmp_references

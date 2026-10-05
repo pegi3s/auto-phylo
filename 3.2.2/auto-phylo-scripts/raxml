@@ -1,0 +1,44 @@
+#!/bin/bash
+
+raxml_autop_version=3.0.0
+raxml_docker_version=8.2.12
+raxml_program_version=8.2.12
+raxml_ref="Stamatakis A. (2014)"
+raxml_doi="10.1093/bioinformatics/btu033"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$raxml_docker_c_version" != "" ]; then
+	raxml_autop_version="?"
+	raxml_docker_version=$raxml_docker_c_version
+	raxml_program_version="?"
+	raxml_ref="?"
+	raxml_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Executing RaxML"
+
+mkdir -p /data/$prefix"1-RAxML" /data/$out_dir
+
+docker run --rm -v $dir:/data pegi3s/raxml:$raxml_docker_version raxmlHPC -m GTRGAMMAI -p 12345 -s /data/$input_dir/$file_name -n raxml_output -w /data/$out_dir > /dev/null 2>&1
+mv /data/$out_dir/RAxML_log* /data/$prefix"1-RAxML"
+mv /data/$out_dir/RAxML_info* /data/$prefix"1-RAxML"
+mv /data/$out_dir/RAxML_parsimony* /data/$prefix"1-RAxML"
+mv /data/$out_dir/RAxML_result* /data/$prefix"1-RAxML"
+mv /data/$out_dir/RAxML_bestTree.raxml_output /data/$out_dir/RAxML_bestTree.raxml_output.nwk
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*raxml" "$versions_file"; then
+    echo "raxml $raxml_autop_version,pegi3s/raxml:$raxml_docker_version,RaxML $raxml_program_version,\"$raxml_ref\",\"$raxml_doi\"" >> "$versions_file"
+fi
+
+echo -e "raxml_ref=\"$raxml_ref\"\nraxml_doi=\"$raxml_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+
+

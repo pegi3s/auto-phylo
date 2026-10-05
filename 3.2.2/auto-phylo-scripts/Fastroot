@@ -1,0 +1,41 @@
+#!/bin/bash
+
+fastroot_autop_version=3.0.0
+fastroot_docker_version=1.5
+fastroot_program_version=1.5
+fastroot_ref="Mai, U., Sayyari, E., & Mirarab, S. (2017)"
+fastroot_doi="10.1371/journal.pone.0182238"
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+if [ "$fastroot_docker_c_version" != "" ]; then
+	fastroot_autop_version="?"
+	fastroot_docker_version=$fastroot_docker_c_version
+	fastroot_program_version="?"
+	fastroot_ref="?"
+	fastroot_doi="?"
+fi
+
+file_name=$(cd /data/$input_dir && ls *)
+
+echo "Rooting the tree with Fastroot"
+mkdir -p /data/$prefix"1-FastRoot_tree_rooting" /data/$out_dir
+if [ $fastroot_rooting_method == "og" ] || [ $fastroot_rooting_method == "OG" ]; then
+	docker run --rm -v $dir:/data pegi3s/fastroot:$fastroot_docker_version -i /data/$input_dir/$file_name -m $fastroot_rooting_method -g "$fastroot_outgroup" -o /data/$prefix"1-FastRoot_tree_rooting"/$file_name"_rooted.nwk" > /dev/null 2>&1
+else
+	docker run --rm -v $dir:/data pegi3s/fastroot:$fastroot_docker_version -i /data/$input_dir/$file_name -m $fastroot_rooting_method -o /data/$prefix"1-FastRoot_tree_rooting"/$file_name"_rooted.nwk" > /dev/null 2>&1
+fi
+cp /data/$prefix"1-FastRoot_tree_rooting"/*_rooted.nwk /data/$out_dir
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*FastRoot" "$versions_file"; then
+    echo "FastRoot $fastroot_autop_version,pegi3s/fastroot:$fastroot_docker_version,FastRoot $fastroot_program_version,\"$fastroot_ref\",\"$fastroot_doi\"" >> "$versions_file"
+fi
+
+echo -e "fastroot_ref=\"$fastroot_ref\"\nfastroot_doi=\"$fastroot_doi\"" >> /data/$project/intermediate_files/refs/tmp_references
+

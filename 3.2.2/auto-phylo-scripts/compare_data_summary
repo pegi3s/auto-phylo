@@ -1,0 +1,38 @@
+#!/bin/bash
+
+compare_data_summary_version=3.0.0
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+echo "Comparing lists"
+mkdir -p /data/$out_dir /data/$prefix"1-Comparing_lists"
+
+files=($(ls /data/$input_dir | head -n 2))
+
+list1=${files[0]}
+list2=${files[1]}
+
+cat /data/$input_dir/$list1 /data/$input_dir/$list2 | sort > /data/$out_dir/sorted_combined_list
+uniq -u /data/$out_dir/sorted_combined_list > /data/$out_dir/different_species
+uniq -d /data/$out_dir/sorted_combined_list > /data/$out_dir/common_species
+
+{
+    echo "These are the common species between $list1 and $list2:"
+    cat /data/$out_dir/common_species
+    echo ""
+    echo "These are the different species between $list1 and $list2:"
+    cat /data/$out_dir/different_species
+} > /data/$out_dir/species_comparison
+
+rm -r /data/$out_dir/sorted_combined_list
+cp /data/$out_dir/* /data/$prefix"1-Comparing_lists"
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*compare_data_summary" "$versions_file"; then
+    echo "compare_data_summary $compare_data_summary_version,,," >> "$versions_file"
+fi

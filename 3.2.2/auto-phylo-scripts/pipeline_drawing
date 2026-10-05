@@ -1,0 +1,87 @@
+#!/bin/bash
+
+pipeline_drawing_autop_version=3.0.0
+pipeline_drawing_docker_version=2.43.0
+pipeline_drawing_program_version=2.43.0
+
+. /data/config
+
+if [ "$pipeline_drawing_docker_c_version" != "" ]; then
+	pipeline_drawing_autop_version="?"
+	pipeline_drawing_docker_version=$pipeline_drawing_docker_c_version
+	pipeline_drawing_program_version="?"
+fi
+
+filename=pipeline
+
+echo "Drawing pipeline"
+
+cd /tmp
+cp /data/$filename pipeline_with_data_tmp
+cat /data/$filename | cut -f2 -d ' '| sort -u >> input_list
+cat /data/$filename | cut -f3 -d' ' | sort -u >> output_list
+cat input_list output_list | sort | uniq -u > unique_list1
+cat input_list unique_list1 | sort | uniq -d > unique_list2
+rm input_list output_list unique_list1
+while read unique_input; do
+    grep " "$unique_input" " /data/$filename >> unique_list_commands
+done < unique_list2
+while read unique_list_commands; do
+    third=$(echo $unique_list_commands | cut -f2 -d' ')
+    echo "data data "$third >> pipeline_with_data_tmp
+done < unique_list_commands
+rm unique_list2 unique_list_commands
+sort -u pipeline_with_data_tmp > pipeline_with_data
+
+declare -A seen_counts
+
+while read -r line; do
+    first_word=$(echo "$line" | awk '{print $1}')
+    second_word=$(echo "$line" | awk '{print $2}')
+    third_word=$(echo "$line" | awk '{print $3}')
+    if [[ -n "${seen_counts[$first_word]}" ]]; then
+        count=${seen_counts[$first_word]}
+        seen_counts[$first_word]=$((count + 1))
+        modified_first_word="${first_word}§${count}"
+        echo $modified_first_word" "$second_word" "$third_word >> pipeline_mod
+    else
+        modified_first_word="${first_word}§0"
+        echo $modified_first_word" "$second_word" "$third_word >> pipeline_mod
+        seen_counts[$first_word]=1
+    fi
+done < pipeline_with_data
+rm pipeline_with_data
+
+while read -r line; do
+     o_first_field=$(echo "$line" | awk '{print $1}')
+     o_second_field=$(echo "$line" | awk '{print $2}')
+     o_third_field=$(echo "$line" | awk '{print $3}')
+     while read -r next_line; do
+         n_first_field=$(echo "$next_line" | awk '{print $1}')
+         n_second_field=$(echo "$next_line" | awk '{print $2}')
+         if [ "$n_second_field" = "$o_third_field" ]; then
+                  echo "'"$o_first_field"'" "'"$n_first_field"'" >> tmp
+         fi
+     done < pipeline_mod
+done < pipeline_mod
+rm pipeline_mod
+
+sort -u tmp > tmp1
+echo "import graphviz" > pipeline.py
+echo "dot = graphviz.Digraph('Pipeline')" >> pipeline.py
+while read -r value1 value2; do
+        if [ "$value1" != "$value2" ]; then
+    		echo "dot.edge($value1, $value2)" >> pipeline.py
+    	fi
+done < tmp1
+echo "dot.format = 'svg'" >> pipeline.py
+echo "dot.render(directory='/data').replace('\\\\', '/')" >> pipeline.py
+rm tmp tmp1
+cp pipeline.py /data/pipeline.py
+rm pipeline.py
+docker run -v $dir:/data pegi3s/graphviz:$pipeline_drawing_docker_version bash -c "cd /data && python3 pipeline.py"
+rm /data/pipeline.py /data/Pipeline.gv
+sed -i "s/§[0-9]*//g" /data/Pipeline.gv.svg
+
+
+

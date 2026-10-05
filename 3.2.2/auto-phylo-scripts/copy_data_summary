@@ -1,0 +1,22 @@
+#!/bin/bash
+
+copy_data_summary_version=3.0.0
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+echo "Copying species list files"
+mkdir -p /data/$out_dir /data/$prefix"1-Copying_species_list"
+
+input_dir1=$(basename $input_dir)
+cp /data/$input_dir/species_list /data/$out_dir/$input_dir1.species_list
+cp /data/$input_dir/species_list /data/$prefix"1-Copying_species_list"/$input_dir1.species_list
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*copy_data_summary" "$versions_file"; then
+    echo "copy_data_summary $copy_data_summary_version,,," >> "$versions_file"
+fi

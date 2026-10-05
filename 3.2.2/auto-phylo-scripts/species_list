@@ -1,0 +1,46 @@
+#!/bin/bash
+
+species_list_autop_version=3.0.0
+
+. /data/config
+
+input_dir=$1
+out_dir=$2
+prefix=$3
+
+echo "Creating a list with the species names"
+mkdir -p /data/$out_dir /data/$prefix"1-Species_list"
+
+for file in /data/$input_dir/*; do
+    while read -r line; do
+        if [[ $line == ">"* ]]; then
+
+            line=${line// /_}
+
+            organism=$(echo $line | cut -d '>' -f 2 | cut -d '_' -f1,2)
+            echo $organism >> /data/$out_dir/output
+        fi
+    done < $file
+done
+sort /data/$out_dir/output | cut -f1,2 -d'_' | uniq -c | sort -k2 > /data/$out_dir/sorted_output
+
+# check if species_count already exists
+species_count_file=/data/$out_dir/species_count
+if [ -f $species_count_file ]; then
+    species_count_file=/data/$out_dir/species_count_1
+fi
+
+while read count species; do
+    echo "${species} x${count}" >> $species_count_file
+done < /data/$out_dir/sorted_output
+
+rm -r /data/$out_dir/output
+rm -r /data/$out_dir/sorted_output
+cp /data/$out_dir/species_count /data/$prefix"1-Species_list"
+
+versions_file="/data/files_to_keep/versions.csv"
+
+if ! grep -qE "^\s*species_list" "$versions_file"; then
+    echo "species_list $species_list_autop_version,,," >> "$versions_file"
+fi
+
